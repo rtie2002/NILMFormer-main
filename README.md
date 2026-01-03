@@ -132,4 +132,3 @@ series = {KDD '25}
 Work supported by EDF R&D and ANRT French program.
 
 
-hello
