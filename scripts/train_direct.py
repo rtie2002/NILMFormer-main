@@ -14,22 +14,26 @@ from src.helpers.trainer import SeqToSeqTrainer
 from src.helpers.metrics import NILMmetrics
 
 class DirectTensorDataset(Dataset):
-    """Direct tensor dataset for pre-processed data"""
+    """Direct tensor dataset - mimics NILMDataset behavior"""
     def __init__(self, tensor_dir, split):
-        self.inputs = torch.load(Path(tensor_dir) / f"{split}_inputs.pt", weights_only=False)
-        self.target_power = torch.load(Path(tensor_dir) / f"{split}_power.pt", weights_only=False)
-        self.target_state = torch.load(Path(tensor_dir) / f"{split}_state.pt", weights_only=False)
+        # Load separate components like NILMDataset structure
+        self.agg = torch.load(Path(tensor_dir) / f"{split}_agg.pt", weights_only=False)        # (N, 1, L)
+        self.time = torch.load(Path(tensor_dir) / f"{split}_time.pt", weights_only=False)      # (N, 8, L)
+        self.target_power = torch.load(Path(tensor_dir) / f"{split}_power.pt", weights_only=False)  # (N, 1, L)
+        self.target_state = torch.load(Path(tensor_dir) / f"{split}_state.pt", weights_only=False)  # (N, 1, L)
 
     def __len__(self):
-        return len(self.inputs)
+        return len(self.agg)
 
     def __getitem__(self, idx):
-        # Return same format as NILMDataset:
-        # (inputs, target_power, target_state)
+        # Concatenate aggregate + time features on-the-fly (like NILMDataset)
+        # This ensures exact same behavior as NILMDataset
+        inputs = torch.cat([self.agg[idx], self.time[idx]], dim=0)  # (1, L) + (8, L) = (9, L)
+        
         return (
-            self.inputs[idx],       # (9, 256)
-            self.target_power[idx], # (1, 256)
-            self.target_state[idx]  # (1, 256)
+            inputs,                     # (9, 256)
+            self.target_power[idx],     # (1, 256)
+            self.target_state[idx]      # (1, 256)
         )
 
 

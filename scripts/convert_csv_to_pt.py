@@ -196,8 +196,9 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
             print("  [WARNING] Not enough data for windows.")
             continue
 
-        # Prepare Tensors
-        inputs = np.zeros((n_windows, 9, window_size), dtype=np.float32)
+        # Prepare Tensors - Split like NILMDataset
+        agg_data = np.zeros((n_windows, 1, window_size), dtype=np.float32)  # Aggregate only
+        time_data = np.zeros((n_windows, 8, window_size), dtype=np.float32)  # Time features
         target_power = np.zeros((n_windows, 1, window_size), dtype=np.float32)
         target_state = np.zeros((n_windows, 1, window_size), dtype=np.float32)
         
@@ -227,16 +228,17 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
             start = i * stride
             end = start + window_size
             
-            # Input
-            inputs[i, 0, :] = agg_vals[start:end]
-            inputs[i, 1:9, :] = time_vals[:, start:end]
+            # Separate aggregate and time (like NILMDataset)
+            agg_data[i, 0, :] = agg_vals[start:end]
+            time_data[i, :, :] = time_vals[:, start:end]
             
             # Targets
             target_power[i, 0, :] = app_vals[start:end]
-            target_state[i, 0, :] = final_status[start:end]  # Use NILMFormer state
+            target_state[i, 0, :] = final_status[start:end]
 
-        # Save
-        torch.save(torch.from_numpy(inputs), output_dir / f'{split_name}_inputs.pt')
+        # Save - separate aggregate and time features
+        torch.save(torch.from_numpy(agg_data), output_dir / f'{split_name}_agg.pt')
+        torch.save(torch.from_numpy(time_data), output_dir / f'{split_name}_time.pt')
         torch.save(torch.from_numpy(target_power), output_dir / f'{split_name}_power.pt')
         torch.save(torch.from_numpy(target_state), output_dir / f'{split_name}_state.pt')
         
