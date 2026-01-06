@@ -109,9 +109,9 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
         appliance_scaling_type='SameAsPower'
     )
     scaler.is_fitted = True
-    scaler.power_stat1 = None
-    scaler.power_stat2 = [stats['agg_max']]
-    scaler.appliance_stat1 = [0]  # MaxScaling uses 0 shift
+    scaler.power_stat1 = 0  # MaxScaling uses 0 shift
+    scaler.power_stat2 = stats['agg_max']
+    scaler.appliance_stat1 = [0]
     scaler.appliance_stat2 = [stats['app_max']]
     scaler.n_appliance = 1
     
