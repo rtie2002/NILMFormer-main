@@ -119,13 +119,64 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
     print(f"Starting training for {appliance_name}...")
     trainer.train(expes_cfg['epochs'])
     
-    print("Evaluating model...")
+    # Evaluate - matching run_one_expe.py pattern (Lines 177-227)
+    print("\n" + "="*60)
+    print("EVALUATION PHASE")
+    print("="*60)
+    
+    print("\nRestoring best model weights...")
     trainer.restore_best_weights()
-    trainer.evaluate(valid_loader, scaler=scaler, threshold_small_values=0, save_outputs=True, mask="valid_metrics")
-    trainer.evaluate(test_loader, scaler=scaler, threshold_small_values=0, save_outputs=True, mask="test_metrics")
+    
+    print("\n[1/2] Evaluating on VALIDATION set...")
+    trainer.evaluate(
+        valid_loader, 
+        scaler=scaler, 
+        threshold_small_values=0, 
+        save_outputs=True, 
+        mask="valid_metrics"
+    )
+    
+    print("\n[2/2] Evaluating on TEST set...")
+    trainer.evaluate(
+        test_loader, 
+        scaler=scaler, 
+        threshold_small_values=0, 
+        save_outputs=True, 
+        mask="test_metrics"
+    )
+    
+    # Display results - matching run_one_expe.py output
+    print("\n" + "="*60)
+    print("EVALUATION RESULTS")
+    print("="*60)
+    
+    # Timestamp-level metrics
+    if "valid_metrics_timestamp" in trainer.log:
+        print("\n📊 Validation Set (Timestamp-level):")
+        for k, v in trainer.log["valid_metrics_timestamp"].items():
+            print(f"  {k}: {v:.4f}")
+    
+    if "test_metrics_timestamp" in trainer.log:
+        print("\n📊 Test Set (Timestamp-level):")
+        for k, v in trainer.log["test_metrics_timestamp"].items():
+            print(f"  {k}: {v:.4f}")
+    
+    # Window-level metrics (trainer automatically computes these)
+    if "valid_metrics_win" in trainer.log:
+        print("\n📊 Validation Set (Window-level):")
+        for k, v in trainer.log["valid_metrics_win"].items():
+            print(f"  {k}: {v:.4f}")
+    
+    if "test_metrics_win" in trainer.log:
+        print("\n📊 Test Set (Window-level):")
+        for k, v in trainer.log["test_metrics_win"].items():
+            print(f"  {k}: {v:.4f}")
     
     trainer.save()
-    print(f"✓ Done!")
+    
+    print("\n" + "="*60)
+    print(f"✅ COMPLETE! Results saved to: results/{appliance_name}.pt")
+    print("="*60)
 
 
 if __name__ == "__main__":
