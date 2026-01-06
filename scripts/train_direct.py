@@ -4,6 +4,8 @@ import yaml
 import argparse
 from pathlib import Path
 import sys, os
+import numpy as np
+import pandas as pd
 
 # Ensure we can import from src
 sys.path.append(os.getcwd())
@@ -12,7 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from src.nilmformer.model import NILMFormer
 from src.nilmformer.congif import NILMFormerConfig
 from src.helpers.trainer import SeqToSeqTrainer
-from src.helpers.metrics import NILMmetrics
+from src.helpers.metrics import NILMmetrics, eval_win_energy_aggregation
 from src.helpers.dataset import NILMscaler
 
 class DirectTensorDataset(Dataset):
@@ -41,17 +43,49 @@ class DirectTensorDataset(Dataset):
         )
 
 
+def load_4d_data_for_eval(tensor_dir):
+    """
+    Reconstruct 4D numpy array ONLY for eval_win_energy_aggregation()
+    This maintains compatibility with run_one_expe.py's evaluation
+    """
+    test_agg = torch.load(Path(tensor_dir) / "test_agg.pt", weights_only=False).numpy()
+    test_power = torch.load(Path(tensor_dir) / "test_power.pt", weights_only=False).numpy()
+    test_state = torch.load(Path(tensor_dir) / "test_state.pt", weights_only=False).numpy()
+    
+    N, _, L = test_agg.shape
+    data_4d = np.zeros((N, 2, 2, L), dtype=np.float32)
+    
+    # [N, 2(agg+app), 2(power+state), L]
+    data_4d[:, 0, 0, :] = test_agg[:, 0, :]
+    data_4d[:, 1, 0, :] = test_power[:, 0, :]
+    data_4d[:, 1, 1, :] = test_state[:, 0, :]
+    
+    return data_4d
+
+
+def create_dummy_dates(n_samples, window_size=256):
+    """Create dummy dates for eval_win_energy_aggregation"""
+    start_date = pd.Timestamp('2020-01-01 00:00:00')
+    dates = [start_date + pd.Timedelta(seconds=i * 10 * window_size) for i in range(n_samples)]
+    df = pd.DataFrame({'start_date': dates})
+    df.index.name = 'ID_PDL'
+    return df
+
+
 def train(appliance_name, data_dir='prepared_data/tensors'):
-    # Load configs
+    # ============================================================
+    # STEP 1: Load Configs (same as run_one_expe.py)
+    # ============================================================
     with open('configs/expes.yaml') as f:
         expes_cfg = yaml.safe_load(f)
     with open('configs/models.yaml') as f:
         model_cfg = yaml.safe_load(f)['NILMFormer']
     
     device = torch.device(expes_cfg['device'] if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
     
-    # Data
+    # ============================================================
+    # STEP 2: Load Data (using DirectTensorDataset)
+    # ============================================================
     tensor_dir = Path(data_dir) / appliance_name
     print(f"Loading data from {tensor_dir}")
     
@@ -59,43 +93,45 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
     valid_ds = DirectTensorDataset(tensor_dir, 'valid')
     test_ds = DirectTensorDataset(tensor_dir, 'test')
     
-    # Verify Item Shape
-    sample_input, _, _ = train_ds[0]
-    print(f"DEBUG: Single Item Input Shape: {sample_input.shape}")
-    if sample_input.shape[0] != 9:
-        raise ValueError(f"Dataset returning {sample_input.shape[0]} channels! Expected 9.")
-
+    # ============================================================
+    # STEP 3: Create DataLoaders (same as expes.py Line 144-150)
+    # ============================================================
     train_loader = DataLoader(train_ds, batch_size=expes_cfg['batch_size'], shuffle=False)
     valid_loader = DataLoader(valid_ds, batch_size=1, shuffle=False)
     test_loader = DataLoader(test_ds, batch_size=1, shuffle=False)
     
-    # Scaler
+    # ============================================================
+    # STEP 4: Setup Scaler (same as expes.py/run_one_expe.py Line 90-93)
+    # ============================================================
     stats = torch.load(tensor_dir / 'stats.pt', weights_only=False)
     scaler = NILMscaler(
         power_scaling_type='MaxScaling',
-        appliance_scaling_type='SameAsPower' 
+        appliance_scaling_type='SameAsPower'
     )
     scaler.is_fitted = True
-    scaler.power_stat1 = None 
-    scaler.power_stat2 = stats['agg_max']  # Single value, not list
-    scaler.appliance_stat1 = [0]  # MaxScaling uses 0 shift
-    scaler.appliance_stat2 = [stats['app_max']]  # Single-item list, not [[value]]
+    scaler.power_stat1 = None
+    scaler.power_stat2 = [stats['agg_max']]
+    scaler.appliance_stat1 = None
+    scaler.appliance_stat2 = [[stats['app_max']]]
     scaler.n_appliance = 1
     
-    # Model
-    config = NILMFormerConfig()
-    config.c_in = 1  # Only the aggregate power channel goes through EmbedBlock
-    config.c_embedding = 8  # Number of exogenous (time) features
-    for k, v in model_cfg['model_kwargs'].items():
-        setattr(config, k, v)
+    # ============================================================
+    # STEP 5: Create Model (same as get_model_instance in expes.py Line 84-85)
+    # ============================================================
+    c_in = 1 + 2 * len(expes_cfg.get('list_exo_variables', ['minute', 'hour', 'dow', 'month']))
+    inst_model = NILMFormer(
+        NILMFormerConfig(
+            c_in=1, 
+            c_embedding=c_in - 1, 
+            **model_cfg['model_kwargs']
+        )
+    )
     
-    model = NILMFormer(config)
-    # Move validation loss to CPU/device correctly
-    model.to(device)
-    
-    # Trainer
-    trainer = SeqToSeqTrainer(
-        model,
+    # ============================================================
+    # STEP 6: Create Trainer (same as expes.py Line 152-172)
+    # ============================================================
+    model_trainer = SeqToSeqTrainer(
+        inst_model,
         train_loader=train_loader,
         valid_loader=valid_loader,
         learning_rate=model_cfg['model_training_param']['lr'],
@@ -116,67 +152,96 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
         path_checkpoint=f'results/{appliance_name}'
     )
     
-    print(f"Starting training for {appliance_name}...")
-    trainer.train(expes_cfg['epochs'])
+    # ============================================================
+    # STEP 7: Train Model (same as expes.py Line 174-175)
+    # ============================================================
+    print(f"Training {appliance_name} | {len(train_ds)} samples | {device}")
+    print("Model training...")
+    model_trainer.train(expes_cfg['epochs'])
     
-    # Evaluate - matching run_one_expe.py pattern (Lines 177-227)
-    print("\n" + "="*60)
-    print("EVALUATION PHASE")
-    print("="*60)
+    # ============================================================
+    # STEP 8: Evaluate Model (same as expes.py Line 177-192)
+    # ============================================================
+    print("Eval model...")
+    model_trainer.restore_best_weights()
     
-    print("\nRestoring best model weights...")
-    trainer.restore_best_weights()
-    
-    print("\n[1/2] Evaluating on VALIDATION set...")
-    trainer.evaluate(
-        valid_loader, 
-        scaler=scaler, 
-        threshold_small_values=0, 
-        save_outputs=True, 
-        mask="valid_metrics"
+    # Valid set evaluation (Line 179-185)
+    model_trainer.evaluate(
+        valid_loader,
+        scaler=scaler,
+        threshold_small_values=0,
+        save_outputs=True,
+        mask="valid_metrics",
     )
     
-    print("\n[2/2] Evaluating on TEST set...")
-    trainer.evaluate(
-        test_loader, 
-        scaler=scaler, 
-        threshold_small_values=0, 
-        save_outputs=True, 
-        mask="test_metrics"
+    # Test set evaluation (Line 186-192)
+    model_trainer.evaluate(
+        test_loader,
+        scaler=scaler,
+        threshold_small_values=0,
+        save_outputs=True,
+        mask="test_metrics",
     )
     
-    # Display results - matching run_one_expe.py output
+    # ============================================================
+    # STEP 9: Window Energy Aggregation (same as expes.py Line 210-222)
+    # ============================================================
+    # Reconstruct 4D data for this function only
+    data_test_4d = load_4d_data_for_eval(tensor_dir)
+    st_date_test = create_dummy_dates(len(data_test_4d), expes_cfg.get('window_size', 256))
+    
+    eval_win_energy_aggregation(
+        data_test_4d,
+        st_date_test,
+        model_trainer,
+        scaler=scaler,
+        metrics=NILMmetrics(round_to=5),
+        window_size=expes_cfg.get('window_size', 256),
+        freq=expes_cfg.get('sampling_rate', '10s'),
+        list_exo_variables=expes_cfg.get('list_exo_variables', ['minute', 'hour', 'dow', 'month']),
+        threshold_small_values=0,
+    )
+    
+    # ============================================================
+    # STEP 10: Save (same as expes.py Line 224-226)
+    # ============================================================
+    model_trainer.save()
+    print(f"Training and eval completed! Model weights and log save at: results/{appliance_name}.pt")
+    
+    # ============================================================
+    # Display Results
+    # ============================================================
     print("\n" + "="*60)
     print("EVALUATION RESULTS")
     print("="*60)
     
-    # Timestamp-level metrics
-    if "valid_metrics_timestamp" in trainer.log:
-        print("\n📊 Validation Set (Timestamp-level):")
-        for k, v in trainer.log["valid_metrics_timestamp"].items():
+    if "valid_metrics_timestamp" in model_trainer.log:
+        print("\n📊 Validation (Timestamp):")
+        for k, v in model_trainer.log["valid_metrics_timestamp"].items():
             print(f"  {k}: {v:.4f}")
     
-    if "test_metrics_timestamp" in trainer.log:
-        print("\n📊 Test Set (Timestamp-level):")
-        for k, v in trainer.log["test_metrics_timestamp"].items():
+    if "test_metrics_timestamp" in model_trainer.log:
+        print("\n📊 Test (Timestamp):")
+        for k, v in model_trainer.log["test_metrics_timestamp"].items():
             print(f"  {k}: {v:.4f}")
     
-    # Window-level metrics (trainer automatically computes these)
-    if "valid_metrics_win" in trainer.log:
-        print("\n📊 Validation Set (Window-level):")
-        for k, v in trainer.log["valid_metrics_win"].items():
+    if "valid_metrics_win" in model_trainer.log:
+        print("\n📊 Validation (Window):")
+        for k, v in model_trainer.log["valid_metrics_win"].items():
             print(f"  {k}: {v:.4f}")
     
-    if "test_metrics_win" in trainer.log:
-        print("\n📊 Test Set (Window-level):")
-        for k, v in trainer.log["test_metrics_win"].items():
+    if "test_metrics_win" in model_trainer.log:
+        print("\n📊 Test (Window):")
+        for k, v in model_trainer.log["test_metrics_win"].items():
             print(f"  {k}: {v:.4f}")
     
-    trainer.save()
-    
-    print("\n" + "="*60)
-    print(f"✅ COMPLETE! Results saved to: results/{appliance_name}.pt")
-    print("="*60)
+    # Aggregated metrics (D/W/ME)
+    for freq_agg in ['D', 'W', 'ME']:
+        if f"test_metrics_{freq_agg}" in model_trainer.log:
+            freq_name = {'D': 'Daily', 'W': 'Weekly', 'ME': 'Monthly'}[freq_agg]
+            print(f"\n📊 Test ({freq_name}):")
+            for k, v in model_trainer.log[f"test_metrics_{freq_agg}"].items():
+                print(f"  {k}: {v:.4f}")
 
 
 if __name__ == "__main__":
