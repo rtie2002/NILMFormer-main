@@ -17,17 +17,20 @@ class DirectTensorDataset(Dataset):
     """Direct tensor dataset for pre-processed data"""
     def __init__(self, tensor_dir, split):
         self.inputs = torch.load(Path(tensor_dir) / f"{split}_inputs.pt", weights_only=False)
-        self.targets = torch.load(Path(tensor_dir) / f"{split}_power.pt", weights_only=False)
-        # Mock st_date - not used in DirectTensorDataset but keeps interface consistent
-        self.st_date = None
+        self.target_power = torch.load(Path(tensor_dir) / f"{split}_power.pt", weights_only=False)
+        self.target_state = torch.load(Path(tensor_dir) / f"{split}_state.pt", weights_only=False)
 
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, idx):
-        # Return (input, target_power, target_state)
-        # We don't have real states, use dummy (zeros)
-        return self.inputs[idx], self.targets[idx], torch.zeros_like(self.targets[idx])
+        # Return same format as NILMDataset:
+        # (inputs, target_power, target_state)
+        return (
+            self.inputs[idx],       # (9, 256)
+            self.target_power[idx], # (1, 256)
+            self.target_state[idx]  # (1, 256)
+        )
 
 
 def train(appliance_name, data_dir='prepared_data/tensors'):
