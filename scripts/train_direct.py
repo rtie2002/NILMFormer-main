@@ -111,8 +111,8 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
     scaler.is_fitted = True
     scaler.power_stat1 = None
     scaler.power_stat2 = [stats['agg_max']]
-    scaler.appliance_stat1 = None
-    scaler.appliance_stat2 = [stats['app_max']]  # Single list, not [[value]]
+    scaler.appliance_stat1 = [0]  # MaxScaling uses 0 shift
+    scaler.appliance_stat2 = [stats['app_max']]
     scaler.n_appliance = 1
     
     # ============================================================
