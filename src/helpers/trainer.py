@@ -209,7 +209,7 @@ class SeqToSeqTrainer:
 
         if self.save_checkpoint:
             self.log["best_model_state_dict"] = torch.load(
-                self.path_checkpoint + ".pt"
+                self.path_checkpoint + ".pt", weights_only=False
             )["model_state_dict"]
 
         # =======================update log======================= #
