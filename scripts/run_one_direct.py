@@ -92,15 +92,27 @@ def launch_one_experiment(expes_config: OmegaConf):
             return data_4d
         
         data_train = reconstruct_4d(train_agg, train_time, train_power, train_state)
-        data_valid = reconstruct_4d(valid_agg, valid_time, valid_power, valid_state)
+        # data_valid = reconstruct_4d(valid_agg, valid_time, valid_power, valid_state) # IGNORE external file
         data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
-        data = np.concatenate([data_train, data_valid, data_test], axis=0)
         
-        # Create start dates - use DataFrame format (required by NILMDataset)
+        # Create full training st_date df for splitting
         import pandas as pd
         st_date_train = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
-        st_date_valid = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_valid), freq='10s')})
+        
+        # CRITICAL FIX: Split Training Data into Train/Valid (80/20) matching run_one_expe.py
+        # run_one_expe.py ignores separate validation houses and splits the training set instead.
+        # This ensures Validation Data is In-Distribution (easy) vs Out-of-Distribution (hard).
+        logging.info("Splitting Training tensors 80/20 for Validation (matching run_one_expe.py behavior)...")
+        data_train, st_date_train, data_valid, st_date_valid = split_train_test_nilmdataset(
+             data_train,
+             st_date_train,
+             perc_house_test=0.2,
+             seed=expes_config.seed
+        )
+        
+        # Re-create other st_dates
         st_date_test = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_test), freq='10s')})
+        data = np.concatenate([data_train, data_valid, data_test], axis=0)
         st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data), freq='10s')})
         
         # Set window size manually since we don't have data_builder
