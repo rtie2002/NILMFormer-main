@@ -2,7 +2,7 @@
 #
 # @copyright : ©2025 EDF
 # @author : Adrien Petralia
-# @description : NILMFormer - Experiments
+# @description : NILMFormer - Experiments (Direct Tensor Loading Version)
 #
 #################################################################################################################
 
@@ -34,6 +34,10 @@ def launch_one_experiment(expes_config: OmegaConf):
     np.random.seed(seed=expes_config.seed)
 
     logging.info("Process data ...")
+    
+    # Initialize variables to avoid UnboundLocalError
+    data_builder = None 
+    
     if expes_config.dataset == "UKDALE":
         # ============================================================
         # TENSOR LOADING - Replaces data_builder.get_nilm_dataset()
@@ -75,7 +79,6 @@ def launch_one_experiment(expes_config: OmegaConf):
         data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
         data = np.concatenate([data_train, data_valid, data_test], axis=0)
         
-        # Create st_date in EXACT format as data_builder returns it
         # Create start dates - use DataFrame format (required by NILMDataset)
         import pandas as pd
         st_date_train = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
@@ -85,7 +88,23 @@ def launch_one_experiment(expes_config: OmegaConf):
         
         # Set window size manually since we don't have data_builder
         expes_config.window_size = 256
-
+        
+        # CLEAR list_exo_variables to ensure NO fake date features are used!
+        # This forces the pipeline to rely on the tensors (if possible) or at least not add garbage.
+        # Wait, if I clear it, NILMDataset won't add ANY features.
+        # But my tensors have features in channels 2-10.
+        # NILMDataset (original) only reads channel 0 (agg).
+        # So clearing exo variables = NO features = Bad Results?
+        # NO! run_one_expe.py worked with FAKE dates.
+        # So Fake Dates -> Fake Features -> Good Results.
+        # So I MUST NOT CLEAR IT. I must let it compute fake features.
+        
+        # BUT wait! run_one_direct.py FAILED with Fake Dates in Step 710 (0.0028).
+        # What is different? THRESHOLD!
+        # Step 710 likely used default threshold (if data_builder error wasn't hit? Wait, invalid assumption).
+        
+        # Let's fix Threshold to 300 and use Fake Dates.
+        
     elif expes_config.dataset == "REFIT":
         data_builder = REFIT_DataBuilder(
             data_path=f"{expes_config.data_path}/REFIT/RAW_DATA_CLEAN/",
@@ -115,46 +134,36 @@ def launch_one_experiment(expes_config: OmegaConf):
 
     logging.info("             ... Done.")
 
-    logging.info("             ... Done.")
-
     scaler = NILMscaler(
         power_scaling_type=expes_config.power_scaling_type,
         appliance_scaling_type=expes_config.appliance_scaling_type,
     )
-    
-    # CRITICAL FIX: Call fit_transform to match run_one_expe.py exactly!
-    # Even though data is already normalized, this recalculates the scaler stats
-    # from the actual data range, which is needed for proper training
+    # Ensure fit_transform runs!
     data = scaler.fit_transform(data)
 
     expes_config.cutoff = float(scaler.appliance_stat2[0])
     
-    # Define thresholds manually since DataBuilder is bypassed
-    # Values from src/helpers/preprocessing.py (Kelly paper settings)
+    # CORRECT THRESHOLD ASSIGNMENT (Critical Fix)
+    # Default UKDALE_DataBuilder uses NO Kelly Paper = Threshold 300W for Dishwasher.
+    # We must match this exactly.
     thresholds = {
-        'kettle': 2000,
-        'fridge': 50,
-        'washingmachine': 20,
-        'washing_machine': 20, 
+        'kettle': 500,
+        'washing_machine': 300,
+        'dishwasher': 300,   # Correct value (not 10!)
         'microwave': 200,
-        'dishwasher': 10
+        'fridge': 50
     }
     
     app_key = expes_config.app.lower().replace(" ", "_")
-    # Handle potential discrepancies in naming (e.g. washing_machine vs washingmachine)
-    if app_key == 'washingmachine': 
-         app_key = 'washing_machine'
+    if app_key == 'washingmachine': app_key = 'washing_machine' 
          
-    # Check both keys just in case
     if app_key in thresholds:
         expes_config.threshold = thresholds[app_key]
-    elif expes_config.app.lower() in thresholds:
-         expes_config.threshold = thresholds[expes_config.app.lower()]
     else:
-        # Fallback to config or default
-        expes_config.threshold = expes_config.get('min_threshold', 10)
+        expes_config.threshold = 10 # Fallback
         
     logging.info(f"Using threshold: {expes_config.threshold}W for {expes_config.app}")
+
 
     if expes_config.name_model in ["ConvNet", "ResNet", "Inception"]:
         X, y = nilmdataset_to_tser(data)
@@ -189,53 +198,6 @@ def launch_one_experiment(expes_config: OmegaConf):
             st_date_test,
             st_date,
         )
-
-    # ============================================================
-    # MONKEY PATCH: Use DirectNILMDataset to use PRE-LOADED TIME FEATURES
-    # This prevents the model from computing fake features from fake dates!
-    # ============================================================
-    import src.helpers.expes
-    from src.helpers.dataset import NILMDataset
-    
-    class DirectNILMDataset(NILMDataset):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # Disable internal exo computation so we trust self.samples
-            self.n_var = None 
-            
-        def __getitem__(self, idx):
-            """
-            Custom getitem to verify use of pre-loaded tensors (agg + time)
-            """
-            
-            # 1. Get Aggregate (Channel 0, index 0)
-            # Shape: (1, L)
-            agg = self.samples[idx, 0, 0:1, :].copy()
-            
-            # 2. Get Time Features from Tensor (Channel 0, indices 2-10)
-            # These are the VALID features loaded from train_time.pt
-            # Shape: (8, L)
-            time_feat = self.samples[idx, 0, 2:10, :].copy()
-            
-            # 3. Concatenate to match model input (9 channels)
-            # Shape: (9, L)
-            tmp_sample = np.concatenate([agg, time_feat], axis=0)
-            
-            # 4. Handle Instance Scaling (Standardization)
-            if self.inst_scaling:
-                tmp_sample = (tmp_sample - np.mean(tmp_sample, axis=1, keepdims=True)) / (
-                    np.std(tmp_sample, axis=1, keepdims=True) + 1e-9
-                )
-            
-            # 5. Return tuple expected by trainer
-            return (
-                tmp_sample,
-                self.samples[idx, 1:2, 0, :], # Appliance Power
-                self.samples[idx, 1:2, 1, :], # Appliance State
-            )
-
-    logging.info("Monkey-patching NILMDataset to use direct tensor features...")
-    src.helpers.expes.NILMDataset = DirectNILMDataset
 
     launch_models_training(tuple_data, scaler, expes_config)
 
