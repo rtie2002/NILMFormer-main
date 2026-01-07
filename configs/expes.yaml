@@ -16,6 +16,7 @@ epochs: !!int 3
 p_es: !!int 5
 p_rlr: !!int 3
 n_warmup_epochs: !!int 0
+seed: !!int 0
 device: !!str cuda
 all_gpu: false
 

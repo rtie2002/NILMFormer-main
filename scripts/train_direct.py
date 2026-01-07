@@ -81,6 +81,14 @@ def train(appliance_name, data_dir='prepared_data/tensors'):
     with open('configs/models.yaml') as f:
         model_cfg = yaml.safe_load(f)['NILMFormer']
     
+    # Set random seed for reproducibility (same as run_one_expe.py Line 29)
+    seed = expes_cfg.get('seed', 0)
+    np.random.seed(seed=seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    
     device = torch.device(expes_cfg['device'] if torch.cuda.is_available() else 'cpu')
     
     # ============================================================

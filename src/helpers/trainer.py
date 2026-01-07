@@ -208,9 +208,19 @@ class SeqToSeqTrainer:
             self.plot_history()
 
         if self.save_checkpoint:
-            self.log["best_model_state_dict"] = torch.load(
-                self.path_checkpoint + ".pt", weights_only=False
-            )["model_state_dict"]
+            checkpoint_path = self.path_checkpoint + ".pt"
+            if os.path.exists(checkpoint_path):
+                self.log["best_model_state_dict"] = torch.load(
+                    checkpoint_path, weights_only=False
+                )["model_state_dict"]
+            else:
+                # If checkpoint doesn't exist (validation never improved), use current model
+                logging.warning(f"Checkpoint file not found at {checkpoint_path}. Using final model state.")
+                self.log["best_model_state_dict"] = (
+                    self.model.module.state_dict()
+                    if self.device == "cuda" and self.all_gpu
+                    else self.model.state_dict()
+                )
 
         # =======================update log======================= #
         self.log["training_time"] = self.train_time
