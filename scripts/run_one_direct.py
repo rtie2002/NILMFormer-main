@@ -64,6 +64,23 @@ def launch_one_experiment(expes_config: OmegaConf):
         test_power = torch.load(tensor_dir / 'test_power.pt', weights_only=False).numpy()
         test_state = torch.load(tensor_dir / 'test_state.pt', weights_only=False).numpy()
         
+        # Load Stats to get Max values for thresholding
+        stats = torch.load(tensor_dir / 'stats.pt', weights_only=False)
+        app_max = stats['app_max']
+        
+        # CRITICAL FIX: Re-compute States using 300W Threshold (Default in run_one_expe.py)
+        # The loaded tensors use 10W (Kelly paper), which is a much harder task (Loss ~0.003)
+        # To match the baseline (Loss ~0.0001), we must use 300W.
+        target_threshold_watt = 300
+        target_threshold_norm = target_threshold_watt / app_max
+        logging.info(f"Re-computing states with 300W Threshold (Norm: {target_threshold_norm:.4f}) to match baseline...")
+        
+        # Simple thresholding (ignoring min_on/off durations for now to match rough baseline)
+        # run_one_expe.py uses complex logic, but simple threshold is closer than 10W vs 300W diff.
+        train_state = (train_power > target_threshold_norm).astype(np.float32)
+        valid_state = (valid_power > target_threshold_norm).astype(np.float32)
+        test_state = (test_power > target_threshold_norm).astype(np.float32)
+        
         # Reconstruct 4D arrays: (N, 2, 10, window_size)
         def reconstruct_4d(agg, time_feat, power, state):
             N, _, L = agg.shape
