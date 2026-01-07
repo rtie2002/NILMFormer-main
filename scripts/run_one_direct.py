@@ -110,27 +110,22 @@ def launch_one_experiment(expes_config: OmegaConf):
         appliance_scaling_type=expes_config.appliance_scaling_type,
     )
     
-    # CRITICAL: Data is already normalized in tensors!
-    # But we still need to set scaler stats for denormalization during evaluation
-    scaler.is_fitted = True
-    scaler.power_stat1 = 0
-    scaler.power_stat2 = stats['agg_max']
-    scaler.appliance_stat1 = [0]
-    scaler.appliance_stat2 = [stats['app_max']]
-    scaler.n_appliance = 1
-    
-    # Don't transform again (already normalized)
-    # data = scaler.fit_transform(data)  # SKIP THIS
+    # CRITICAL FIX: Call fit_transform to match run_one_expe.py exactly!
+    # Even though data is already normalized, this recalculates the scaler stats
+    # from the actual data range, which is needed for proper training
+    data = scaler.fit_transform(data)
     
     
     expes_config.cutoff = float(scaler.appliance_stat2[0])
     # Threshold comes from datasets.yaml config (loaded in main())
     expes_config.threshold = expes_config.get('min_threshold', 10)  # Default 10W if not set
 
-    # Data is already normalized - skip transformation!
-    # Just pass through as-is
     if expes_config.name_model in ["ConvNet", "ResNet", "Inception"]:
         X, y = nilmdataset_to_tser(data)
+
+        data_train = scaler.transform(data_train)
+        data_valid = scaler.transform(data_valid)
+        data_test = scaler.transform(data_test)
 
         X_train, y_train = nilmdataset_to_tser(data_train)
         X_valid, y_valid = nilmdataset_to_tser(data_valid)
@@ -144,7 +139,10 @@ def launch_one_experiment(expes_config: OmegaConf):
         )
 
     else:
-        # Data already normalized - pass directly to training
+        data_train = scaler.transform(data_train)
+        data_valid = scaler.transform(data_valid)
+        data_test = scaler.transform(data_test)
+
         tuple_data = (
             data_train,
             data_valid,
