@@ -122,9 +122,34 @@ def launch_one_experiment(expes_config: OmegaConf):
     data = scaler.fit_transform(data)
 
     expes_config.cutoff = float(scaler.appliance_stat2[0])
-    expes_config.threshold = data_builder.appliance_param[expes_config.app][
-        "min_threshold"
-    ]
+    expes_config.cutoff = float(scaler.appliance_stat2[0])
+    
+    # Define thresholds manually since DataBuilder is bypassed
+    # Values from src/helpers/preprocessing.py (Kelly paper settings)
+    thresholds = {
+        'kettle': 2000,
+        'fridge': 50,
+        'washingmachine': 20,
+        'washing_machine': 20, 
+        'microwave': 200,
+        'dishwasher': 10
+    }
+    
+    app_key = expes_config.app.lower().replace(" ", "_")
+    # Handle potential discrepancies in naming (e.g. washing_machine vs washingmachine)
+    if app_key == 'washingmachine': 
+         app_key = 'washing_machine'
+         
+    # Check both keys just in case
+    if app_key in thresholds:
+        expes_config.threshold = thresholds[app_key]
+    elif expes_config.app.lower() in thresholds:
+         expes_config.threshold = thresholds[expes_config.app.lower()]
+    else:
+        # Fallback to config or default
+        expes_config.threshold = expes_config.get('min_threshold', 10)
+        
+    logging.info(f"Using threshold: {expes_config.threshold}W for {expes_config.app}")
 
     if expes_config.name_model in ["ConvNet", "ResNet", "Inception"]:
         X, y = nilmdataset_to_tser(data)
