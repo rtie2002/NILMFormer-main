@@ -152,13 +152,29 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
     print(f"[OK] Identified appliance column: '{app_col}'")
 
     # Calculate Stats (MaxScaling - same as NILMFormer)
-    # From expes.yaml: power_scaling_type = MaxScaling
-    agg_max = df_train['aggregate'].max()
-    app_max = df_train[app_col].max()
+    # CRITICAL: Must calculate from ALL data (train+valid+test) BEFORE normalization
+    # This matches run_one_expe.py Line 90-94 which does scaler.fit_transform(ALL_DATA)
+    print("\n[STEP 1] Loading ALL splits to calculate global stats...")
     
-    print(f"Stats (MaxScaling):")
+    all_dfs = []
+    for split_name, file_path in files.items():
+        if file_path.exists():
+            df_split = pd.read_csv(file_path)
+            all_dfs.append(df_split)
+            print(f"  Loaded {split_name}: {len(df_split)} rows")
+    
+    # Concatenate ALL data
+    df_all = pd.concat(all_dfs, ignore_index=True)
+    print(f"  Combined: {len(df_all)} total rows")
+    
+    # Calculate global max from ALL data (NOT just training!)
+    agg_max = df_all['aggregate'].max()
+    app_max = df_all[app_col].max()
+    
+    print(f"\n[STEP 2] Global Stats (from ALL data - train+valid+test):")
     print(f"  Agg max: {agg_max:.2f} W")
     print(f"  App max: {app_max:.2f} W")
+    print(f"  (This matches run_one_expe.py which fits scaler on all data)")
     
     # Save stats for scaler
     stats = {
