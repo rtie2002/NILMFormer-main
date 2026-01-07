@@ -93,12 +93,12 @@ def launch_one_experiment(expes_config: OmegaConf):
     # Combine all for scaler fitting (matching run_one_expe.py behavior)
     data = np.concatenate([data_train, data_valid, data_test], axis=0)
     
-    # Create dummy start dates (not used for training, only for metrics)
+    # Create start dates (DatetimeIndex, not DataFrame!)
     import pandas as pd
-    st_date_train = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
-    st_date_valid = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_valid), freq='10s')})
-    st_date_test = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_test), freq='10s')})
-    st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data), freq='10s')})
+    st_date_train = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_train), freq='10s'))
+    st_date_valid = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_valid), freq='10s'))
+    st_date_test = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_test), freq='10s'))
+    st_date = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data), freq='10s'))
     
     logging.info("             ... Done.")
 
