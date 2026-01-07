@@ -76,12 +76,12 @@ def launch_one_experiment(expes_config: OmegaConf):
         data = np.concatenate([data_train, data_valid, data_test], axis=0)
         
         # Create st_date in EXACT format as data_builder returns it
-        # get_nilm_dataset returns: (data, (pd.DatetimeIndex,))
+        # Create start dates - use DataFrame format (required by NILMDataset)
         import pandas as pd
-        st_date_train = (pd.date_range('2013-01-01', periods=len(data_train), freq='10s'),)
-        st_date_valid = (pd.date_range('2013-01-01', periods=len(data_valid), freq='10s'),)
-        st_date_test = (pd.date_range('2013-01-01', periods=len(data_test), freq='10s'),)
-        st_date = (pd.date_range('2013-01-01', periods=len(data), freq='10s'),)
+        st_date_train = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
+        st_date_valid = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_valid), freq='10s')})
+        st_date_test = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_test), freq='10s')})
+        st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data), freq='10s')})
         
         # Set window size manually since we don't have data_builder
         expes_config.window_size = 256
