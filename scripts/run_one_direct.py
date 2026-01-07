@@ -115,13 +115,18 @@ def launch_one_experiment(expes_config: OmegaConf):
 
     logging.info("             ... Done.")
 
+    logging.info("             ... Done.")
+
     scaler = NILMscaler(
         power_scaling_type=expes_config.power_scaling_type,
         appliance_scaling_type=expes_config.appliance_scaling_type,
     )
+    
+    # CRITICAL FIX: Call fit_transform to match run_one_expe.py exactly!
+    # Even though data is already normalized, this recalculates the scaler stats
+    # from the actual data range, which is needed for proper training
     data = scaler.fit_transform(data)
 
-    expes_config.cutoff = float(scaler.appliance_stat2[0])
     expes_config.cutoff = float(scaler.appliance_stat2[0])
     
     # Define thresholds manually since DataBuilder is bypassed
@@ -184,6 +189,53 @@ def launch_one_experiment(expes_config: OmegaConf):
             st_date_test,
             st_date,
         )
+
+    # ============================================================
+    # MONKEY PATCH: Use DirectNILMDataset to use PRE-LOADED TIME FEATURES
+    # This prevents the model from computing fake features from fake dates!
+    # ============================================================
+    import src.helpers.expes
+    from src.helpers.dataset import NILMDataset
+    
+    class DirectNILMDataset(NILMDataset):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Disable internal exo computation so we trust self.samples
+            self.n_var = None 
+            
+        def __getitem__(self, idx):
+            """
+            Custom getitem to verify use of pre-loaded tensors (agg + time)
+            """
+            
+            # 1. Get Aggregate (Channel 0, index 0)
+            # Shape: (1, L)
+            agg = self.samples[idx, 0, 0:1, :].copy()
+            
+            # 2. Get Time Features from Tensor (Channel 0, indices 2-10)
+            # These are the VALID features loaded from train_time.pt
+            # Shape: (8, L)
+            time_feat = self.samples[idx, 0, 2:10, :].copy()
+            
+            # 3. Concatenate to match model input (9 channels)
+            # Shape: (9, L)
+            tmp_sample = np.concatenate([agg, time_feat], axis=0)
+            
+            # 4. Handle Instance Scaling (Standardization)
+            if self.inst_scaling:
+                tmp_sample = (tmp_sample - np.mean(tmp_sample, axis=1, keepdims=True)) / (
+                    np.std(tmp_sample, axis=1, keepdims=True) + 1e-9
+                )
+            
+            # 5. Return tuple expected by trainer
+            return (
+                tmp_sample,
+                self.samples[idx, 1:2, 0, :], # Appliance Power
+                self.samples[idx, 1:2, 1, :], # Appliance State
+            )
+
+    logging.info("Monkey-patching NILMDataset to use direct tensor features...")
+    src.helpers.expes.NILMDataset = DirectNILMDataset
 
     launch_models_training(tuple_data, scaler, expes_config)
 
