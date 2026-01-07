@@ -12,6 +12,11 @@ import logging
 import numpy as np
 
 from omegaconf import OmegaConf
+import sys
+from pathlib import Path
+
+# Add project root to sys.path to allow importing from src
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.helpers.utils import create_dir
 from src.helpers.preprocessing import (
@@ -90,10 +95,10 @@ def launch_one_experiment(expes_config: OmegaConf):
     
     # Create dummy start dates (not used for training, only for metrics)
     import pandas as pd
-    st_date_train = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_train), freq='10s'))
-    st_date_valid = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_valid), freq='10s'))
-    st_date_test = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_test), freq='10s'))
-    st_date = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data), freq='10s'))
+    st_date_train = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
+    st_date_valid = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_valid), freq='10s')})
+    st_date_test = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_test), freq='10s')})
+    st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data), freq='10s')})
     
     logging.info("             ... Done.")
 

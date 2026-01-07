@@ -12,6 +12,11 @@ import logging
 import numpy as np
 
 from omegaconf import OmegaConf
+import sys
+from pathlib import Path
+
+# Add project root to sys.path to allow importing from src
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.helpers.utils import create_dir
 from src.helpers.preprocessing import (
