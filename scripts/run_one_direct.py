@@ -34,91 +34,97 @@ def launch_one_experiment(expes_config: OmegaConf):
     np.random.seed(seed=expes_config.seed)
 
     logging.info("Process data ...")
-    
-    # ============================================================
-    # MODIFIED: Load pre-prepared tensors instead of raw data
-    # ============================================================
-    import torch
-    from pathlib import Path
-    
-    tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
-    
-    logging.info(f"Loading tensors from {tensor_dir}")
-    
-    # Load all tensors
-    train_agg = torch.load(tensor_dir / 'train_agg.pt', weights_only=False).numpy()
-    train_time = torch.load(tensor_dir / 'train_time.pt', weights_only=False).numpy()
-    train_power = torch.load(tensor_dir / 'train_power.pt', weights_only=False).numpy()
-    train_state = torch.load(tensor_dir / 'train_state.pt', weights_only=False).numpy()
-    
-    valid_agg = torch.load(tensor_dir / 'valid_agg.pt', weights_only=False).numpy()
-    valid_time = torch.load(tensor_dir / 'valid_time.pt', weights_only=False).numpy()
-    valid_power = torch.load(tensor_dir / 'valid_power.pt', weights_only=False).numpy()
-    valid_state = torch.load(tensor_dir / 'valid_state.pt', weights_only=False).numpy()
-    
-    test_agg = torch.load(tensor_dir / 'test_agg.pt', weights_only=False).numpy()
-    test_time = torch.load(tensor_dir / 'test_time.pt', weights_only=False).numpy()
-    test_power = torch.load(tensor_dir / 'test_power.pt', weights_only=False).numpy()
-    test_state = torch.load(tensor_dir / 'test_state.pt', weights_only=False).numpy()
-    
-    stats = torch.load(tensor_dir / 'stats.pt', weights_only=False)
-    
-    logging.info(f"  Train: {train_agg.shape[0]} windows")
-    logging.info(f"  Valid: {valid_agg.shape[0]} windows")
-    logging.info(f"  Test: {test_agg.shape[0]} windows")
-    
-    # Reconstruct 4D arrays matching run_one_expe.py format: (N, 2, 10, L)
-    # Channel 0: [agg, padding, time_features_8]
-    # Channel 1: [power, state, padding_8]
-    
-    def reconstruct_4d(agg, time_feat, power, state):
-        """Reconstruct 4D array from tensors"""
-        N, _, L = agg.shape
-        data_4d = np.zeros((N, 2, 10, L))
+    if expes_config.dataset == "UKDALE":
+        # ============================================================
+        # TENSOR LOADING - Replaces data_builder.get_nilm_dataset()
+        # ============================================================
+        import torch
+        from pathlib import Path
         
-        # Channel 0: aggregate + padding + time features
-        data_4d[:, 0, 0:1, :] = agg  # aggregate
-        data_4d[:, 0, 2:10, :] = time_feat  # time features (8 channels)
+        tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
+        logging.info(f"Loading tensors from {tensor_dir}")
         
-        # Channel 1: appliance power + state + padding
-        data_4d[:, 1, 0, :] = power[:, 0, :]  # appliance power
-        data_4d[:, 1, 1, :] = state[:, 0, :]  # appliance state
+        # Load all tensors
+        train_agg = torch.load(tensor_dir / 'train_agg.pt', weights_only=False).numpy()
+        train_time = torch.load(tensor_dir / 'train_time.pt', weights_only=False).numpy()
+        train_power = torch.load(tensor_dir / 'train_power.pt', weights_only=False).numpy()
+        train_state = torch.load(tensor_dir / 'train_state.pt', weights_only=False).numpy()
         
-        return data_4d
-    
-    data_train = reconstruct_4d(train_agg, train_time, train_power, train_state)
-    data_valid = reconstruct_4d(valid_agg, valid_time, valid_power, valid_state)
-    data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
-    
-    # Combine all for scaler fitting (matching run_one_expe.py behavior)
-    data = np.concatenate([data_train, data_valid, data_test], axis=0)
-    
-    # Create start dates (DatetimeIndex, not DataFrame!)
-    import pandas as pd
-    st_date_train = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_train), freq='10s'))
-    st_date_valid = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_valid), freq='10s'))
-    st_date_test = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data_test), freq='10s'))
-    st_date = pd.DatetimeIndex(pd.date_range('2013-01-01', periods=len(data), freq='10s'))
-    
+        valid_agg = torch.load(tensor_dir / 'valid_agg.pt', weights_only=False).numpy()
+        valid_time = torch.load(tensor_dir / 'valid_time.pt', weights_only=False).numpy()
+        valid_power = torch.load(tensor_dir / 'valid_power.pt', weights_only=False).numpy()
+        valid_state = torch.load(tensor_dir / 'valid_state.pt', weights_only=False).numpy()
+        
+        test_agg = torch.load(tensor_dir / 'test_agg.pt', weights_only=False).numpy()
+        test_time = torch.load(tensor_dir / 'test_time.pt', weights_only=False).numpy()
+        test_power = torch.load(tensor_dir / 'test_power.pt', weights_only=False).numpy()
+        test_state = torch.load(tensor_dir / 'test_state.pt', weights_only=False).numpy()
+        
+        # Reconstruct 4D arrays: (N, 2, 10, window_size)
+        def reconstruct_4d(agg, time_feat, power, state):
+            N, _, L = agg.shape
+            data_4d = np.zeros((N, 2, 10, L))
+            data_4d[:, 0, 0:1, :] = agg
+            data_4d[:, 0, 2:10, :] = time_feat
+            data_4d[:, 1, 0, :] = power[:, 0, :]
+            data_4d[:, 1, 1, :] = state[:, 0, :]
+            return data_4d
+        
+        data_train = reconstruct_4d(train_agg, train_time, train_power, train_state)
+        data_valid = reconstruct_4d(valid_agg, valid_time, valid_power, valid_state)
+        data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
+        data = np.concatenate([data_train, data_valid, data_test], axis=0)
+        
+        # Create st_date in EXACT format as data_builder returns it
+        # get_nilm_dataset returns: (data, (pd.DatetimeIndex,))
+        import pandas as pd
+        st_date_train = (pd.date_range('2013-01-01', periods=len(data_train), freq='10s'),)
+        st_date_valid = (pd.date_range('2013-01-01', periods=len(data_valid), freq='10s'),)
+        st_date_test = (pd.date_range('2013-01-01', periods=len(data_test), freq='10s'),)
+        st_date = (pd.date_range('2013-01-01', periods=len(data), freq='10s'),)
+        
+        # Set window size manually since we don't have data_builder
+        expes_config.window_size = 256
+
+    elif expes_config.dataset == "REFIT":
+        data_builder = REFIT_DataBuilder(
+            data_path=f"{expes_config.data_path}/REFIT/RAW_DATA_CLEAN/",
+            mask_app=expes_config.app,
+            sampling_rate=expes_config.sampling_rate,
+            window_size=expes_config.window_size,
+        )
+
+        data, st_date = data_builder.get_nilm_dataset(
+            house_indicies=expes_config.house_with_app_i
+        )
+
+        if isinstance(expes_config.window_size, str):
+            expes_config.window_size = data_builder.window_size
+
+        data_train, st_date_train, data_test, st_date_test = (
+            split_train_test_pdl_nilmdataset(
+                data.copy(), st_date.copy(), nb_house_test=2, seed=expes_config.seed
+            )
+        )
+
+        data_train, st_date_train, data_valid, st_date_valid = (
+            split_train_test_pdl_nilmdataset(
+                data_train, st_date_train, nb_house_test=1, seed=expes_config.seed
+            )
+        )
+
     logging.info("             ... Done.")
 
-    # ============================================================
-    # UNCHANGED: Rest of pipeline identical to run_one_expe.py
-    # ============================================================
     scaler = NILMscaler(
         power_scaling_type=expes_config.power_scaling_type,
         appliance_scaling_type=expes_config.appliance_scaling_type,
     )
-    
-    # CRITICAL FIX: Call fit_transform to match run_one_expe.py exactly!
-    # Even though data is already normalized, this recalculates the scaler stats
-    # from the actual data range, which is needed for proper training
     data = scaler.fit_transform(data)
-    
-    
+
     expes_config.cutoff = float(scaler.appliance_stat2[0])
-    # Threshold comes from datasets.yaml config (loaded in main())
-    expes_config.threshold = expes_config.get('min_threshold', 10)  # Default 10W if not set
+    expes_config.threshold = data_builder.appliance_param[expes_config.app][
+        "min_threshold"
+    ]
 
     if expes_config.name_model in ["ConvNet", "ResNet", "Inception"]:
         X, y = nilmdataset_to_tser(data)
