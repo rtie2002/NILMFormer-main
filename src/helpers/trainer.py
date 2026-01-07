@@ -210,9 +210,25 @@ class SeqToSeqTrainer:
         if self.save_checkpoint:
             checkpoint_path = self.path_checkpoint + ".pt"
             if os.path.exists(checkpoint_path):
-                self.log["best_model_state_dict"] = torch.load(
-                    checkpoint_path, weights_only=False
-                )["model_state_dict"]
+                try:
+                    checkpoint_data = torch.load(checkpoint_path, weights_only=False)
+                    # Handle different checkpoint formats
+                    if isinstance(checkpoint_data, dict) and "model_state_dict" in checkpoint_data:
+                        self.log["best_model_state_dict"] = checkpoint_data["model_state_dict"]
+                    else:
+                        logging.warning(f"Checkpoint format unexpected. Using current model state.")
+                        self.log["best_model_state_dict"] = (
+                            self.model.module.state_dict()
+                            if self.device == "cuda" and self.all_gpu
+                            else self.model.state_dict()
+                        )
+                except Exception as e:
+                    logging.warning(f"Error loading checkpoint: {e}. Using current model state.")
+                    self.log["best_model_state_dict"] = (
+                        self.model.module.state_dict()
+                        if self.device == "cuda" and self.all_gpu
+                        else self.model.state_dict()
+                    )
             else:
                 # If checkpoint doesn't exist (validation never improved), use current model
                 logging.warning(f"Checkpoint file not found at {checkpoint_path}. Using final model state.")
