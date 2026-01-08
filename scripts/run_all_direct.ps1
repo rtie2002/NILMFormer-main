@@ -1,162 +1,105 @@
-# Run all UKDALE experiments with run_one_direct.py (Tensor-based pipeline)
-# This script runs training for all appliances using pre-prepared tensors
+# Global parameters
+$SEEDS = @(0, 1, 2)
 
-# List of UKDALE appliances
-$appliances = @(
-    "Dishwasher",
-    "Fridge", 
-    "Kettle",
-    "Microwave",
-    "WashingMachine"
-)
+$DATASETS_1 = @("REFIT")
+$APPLIANCES_1 = @("WashingMachine", "Dishwasher", "Kettle", "Microwave")
 
-# Results storage
-$results = @()
+$DATASETS_2 = @("UKDALE")
+$APPLIANCES_2 = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
 
-Write-Host "`n============================================================" -ForegroundColor Green
-Write-Host "UKDALE Experiments - NILMFormer (Tensor Pipeline)" -ForegroundColor Green
-Write-Host "Total experiments: $($appliances.Count)" -ForegroundColor Green
-Write-Host "============================================================`n" -ForegroundColor Green
+$MODELS_1 = @("NILMFormer")
+$WINDOW_SIZES_1 = @("256")
 
-$experimentCount = 0
-$totalExperiments = $appliances.Count
-$successCount = 0
-$failCount = 0
+# Removed MODELS_2 and WINDOW_SIZES_2 as they are not needed
 
-foreach ($appliance in $appliances) {
-    $experimentCount++
+# Run experiments
+function Run-Batch {
+    param (
+        [Parameter(Mandatory = $true)] [string[]]$Datasets,
+        [Parameter(Mandatory = $true)] [string[]]$Appliances,
+        [Parameter(Mandatory = $true)] [string[]]$Models,
+        [Parameter(Mandatory = $true)] [string[]]$WindowSizes
+    )
+
+    foreach ($dataset in $Datasets) {
+        foreach ($appliance in $Appliances) {
+            foreach ($win in $WindowSizes) {
+                foreach ($model in $Models) {
+                    foreach ($seed in $SEEDS) {
+                        Write-Host "`n========================================" -ForegroundColor Cyan
+                        Write-Host "Running: python -m scripts.run_one_direct --dataset $dataset --sampling_rate 1min --appliance $appliance --window_size $win --name_model $model --seed $seed" -ForegroundColor Yellow
+                        Write-Host "========================================`n" -ForegroundColor Cyan
+                        
+                        python -m scripts.run_one_direct `
+                            --dataset "$dataset" `
+                            --sampling_rate "1min" `
+                            --appliance "$appliance" `
+                            --window_size "$win" `
+                            --name_model "$model" `
+                            --seed "$seed"
+                        
+                        # Display evaluation results
+                        $resultPath = "result/${dataset}_${appliance}_1min/${win}/${model}_${seed}.pt"
+                        if (Test-Path $resultPath) {
+                            Write-Host "`n========================================" -ForegroundColor Green
+                            Write-Host "Evaluation Results for $dataset - $appliance - $model (seed $seed)" -ForegroundColor Green
+                            Write-Host "========================================" -ForegroundColor Green
+                            
+                            # Use Python to read and display the metrics from the .pt file
+                            python -c @"
+import torch
+import sys
+
+try:
+    log = torch.load('$resultPath', weights_only=False)
     
-    Write-Host "`n========================================" -ForegroundColor Yellow
-    Write-Host "Experiment $experimentCount/$totalExperiments" -ForegroundColor Yellow
-    Write-Host "Appliance: $appliance" -ForegroundColor Yellow
-    Write-Host "========================================`n" -ForegroundColor Yellow
+    print('\n--- Test Metrics (Timestamp) ---')
+    if 'test_metrics_timestamp' in log:
+        metrics = log['test_metrics_timestamp']
+        for key, value in metrics.items():
+            print(f'  {key}: {value:.6f}')
     
-    # Check if prepared tensors exist
-    $tensorDir = "prepared_data/tensors/$($appliance.ToLower())"
+    print('\n--- Test Metrics (Window) ---')
+    if 'test_metrics_win' in log:
+        metrics = log['test_metrics_win']
+        for key, value in metrics.items():
+            print(f'  {key}: {value:.6f}')
     
-    if (Test-Path $tensorDir) {
-        Write-Host "[OK] Found prepared tensors in $tensorDir" -ForegroundColor Green
+    print('\n--- Validation Metrics (Timestamp) ---')
+    if 'valid_metrics_timestamp' in log:
+        metrics = log['valid_metrics_timestamp']
+        for key, value in metrics.items():
+            print(f'  {key}: {value:.6f}')
+    
+    print('\n--- Training Info ---')
+    if 'epoch_best_loss' in log:
+        print(f'  Best Epoch: {log[\"epoch_best_loss\"]}')
+    if 'value_best_loss' in log:
+        print(f'  Best Loss: {log[\"value_best_loss\"]:.6f}')
+    if 'training_time' in log:
+        print(f'  Training Time: {log[\"training_time\"]:.2f}s')
+    if 'test_metrics_time' in log:
+        print(f'  Test Time: {log[\"test_metrics_time\"]:.2f}s')
         
-        # Run training with run_one_direct.py
-        Write-Host "Running: python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_size 256 --appliance $appliance --name_model NILMFormer --seed 0`n" -ForegroundColor Cyan
-        $startTime = Get-Date
-        
-        # Capture output to parse metrics
-        python scripts/run_one_direct.py `
-            --dataset UKDALE `
-            --sampling_rate 1min `
-            --window_size 256 `
-            --appliance $appliance `
-            --name_model NILMFormer `
-            --seed 0 2>&1 | Tee-Object -Variable capturedOutput | Out-Null
-        
-        $endTime = Get-Date
-        $duration = $endTime - $startTime
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "`n[SUCCESS] Completed $appliance in $($duration.ToString('hh\:mm\:ss'))" -ForegroundColor Green
-            $successCount++
-            
-            # Parse metrics from output
-            $testMAE = "N/A"
-            $testF1 = "N/A"
-            $testAcc = "N/A"
-            $validLoss = "N/A"
-            
-            foreach ($line in $capturedOutput) {
-                if ($line -match "Test.*MAE.*:\s*([\d.]+)") {
-                    $testMAE = [math]::Round([double]$matches[1], 2)
-                }
-                if ($line -match "Test.*F1.*:\s*([\d.]+)") {
-                    $testF1 = [math]::Round([double]$matches[1], 4)
-                }
-                if ($line -match "Test.*Accuracy.*:\s*([\d.]+)") {
-                    $testAcc = [math]::Round([double]$matches[1], 4)
-                }
-                if ($line -match "Valid\s+loss\s*:\s*([\d.]+)") {
-                    $validLoss = [math]::Round([double]$matches[1], 6)
+except Exception as e:
+    print(f'Error reading results: {e}', file=sys.stderr)
+"@
+                            Write-Host "========================================`n" -ForegroundColor Green
+                        }
+                        else {
+                            Write-Host "`nWarning: Result file not found at $resultPath`n" -ForegroundColor Red
+                        }
+                    }
                 }
             }
-            
-            # Store results
-            $results += [PSCustomObject]@{
-                Appliance = $appliance
-                Status    = "OK"
-                ValidLoss = $validLoss
-                TestMAE   = $testMAE
-                TestF1    = $testF1
-                TestAcc   = $testAcc
-                Duration  = $duration.ToString('hh\:mm\:ss')
-            }
-            
-            # Display immediate results
-            Write-Host ""
-            Write-Host "=== Results for $appliance ===" -ForegroundColor Cyan
-            Write-Host "  Valid Loss: $validLoss" -ForegroundColor White
-            Write-Host "  Test MAE:   $testMAE W" -ForegroundColor White
-            Write-Host "  Test F1:    $testF1" -ForegroundColor White
-            Write-Host "  Test Acc:   $testAcc" -ForegroundColor White
-        }
-        else {
-            Write-Host "`n[FAILED] Training failed for $appliance" -ForegroundColor Red
-            $failCount++
-            
-            # Store failure
-            $results += [PSCustomObject]@{
-                Appliance = $appliance
-                Status    = "FAIL"
-                ValidLoss = "FAILED"
-                TestMAE   = "FAILED"
-                TestF1    = "FAILED"
-                TestAcc   = "FAILED"
-                Duration  = $duration.ToString('hh\:mm\:ss')
-            }
-            
-            Write-Host "Continue with next experiment? (Y/N)" -ForegroundColor Yellow
-            $response = Read-Host
-            if ($response -ne "Y" -and $response -ne "y") {
-                Write-Host "Stopping experiments..." -ForegroundColor Red
-                break
-            }
-        }
-    }
-    else {
-        Write-Host "[ERROR] Tensors not found in $tensorDir" -ForegroundColor Red
-        Write-Host "You need to run: python prepared_data/convert_csv_to_pt.py --appliance $($appliance.ToLower())" -ForegroundColor Yellow
-        $failCount++
-        
-        # Store skip
-        $results += [PSCustomObject]@{
-            Appliance = $appliance
-            Status    = "SKIP"
-            ValidLoss = "SKIPPED"
-            TestMAE   = "SKIPPED"
-            TestF1    = "SKIPPED"
-            TestAcc   = "SKIPPED"
-            Duration  = "00:00:00"
-        }
-        
-        Write-Host "Skip this experiment? (Y/N)" -ForegroundColor Yellow
-        $response = Read-Host
-        if ($response -ne "Y" -and $response -ne "y") {
-            Write-Host "Stopping experiments..." -ForegroundColor Red
-            break
         }
     }
 }
 
-Write-Host "`n============================================================" -ForegroundColor Green
-Write-Host "ALL EXPERIMENTS COMPLETED!" -ForegroundColor Green
-Write-Host "Success: $successCount | Failed: $failCount | Total: $totalExperiments" -ForegroundColor Green
-Write-Host "============================================================`n" -ForegroundColor Green
-
-# Display results table
-Write-Host "`n========== RESULTS SUMMARY TABLE ==========" -ForegroundColor Cyan
-$results | Format-Table -AutoSize -Property Appliance, Status, ValidLoss, TestMAE, TestF1, TestAcc, Duration
-
-Write-Host ""
-Write-Host "Legend:" -ForegroundColor Yellow
-Write-Host "  OK = Success  |  FAIL = Failed  |  SKIP = Skipped (No tensors)" -ForegroundColor White
-
+#####################################
+# Run all possible experiments
+#####################################
+Run-Batch -Datasets $DATASETS_1 -Appliances $APPLIANCES_1 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1
+Run-Batch -Datasets $DATASETS_2 -Appliances $APPLIANCES_2 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1
 Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
 Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_0/" -ForegroundColor White
