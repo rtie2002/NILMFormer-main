@@ -233,9 +233,12 @@ def launch_one_experiment(expes_config: OmegaConf):
         )
 
     else:
-        data_train = scaler.transform(data_train)
-        data_valid = scaler.transform(data_valid)
-        data_test = scaler.transform(data_test)
+        # UKDALE: Data from tensors is ALREADY NORMALIZED (0-1 range)
+        # DO NOT call scaler.transform() - it would cause double normalization!
+        # The scaler is only needed for inverse_transform during evaluation
+        # data_train = scaler.transform(data_train)  # REMOVED
+        # data_valid = scaler.transform(data_valid)  # REMOVED
+        # data_test = scaler.transform(data_test)    # REMOVED
 
         tuple_data = (
             data_train,
