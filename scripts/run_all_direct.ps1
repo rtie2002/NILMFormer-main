@@ -81,7 +81,7 @@ foreach ($appliance in $appliances) {
             # Store results
             $results += [PSCustomObject]@{
                 Appliance = $appliance
-                Status    = "✓"
+                Status    = "OK"
                 ValidLoss = $validLoss
                 TestMAE   = $testMAE
                 TestF1    = $testF1
@@ -91,7 +91,7 @@ foreach ($appliance in $appliances) {
             
             # Display immediate results
             Write-Host ""
-            Write-Host "--- Results for $appliance ---" -ForegroundColor Cyan
+            Write-Host "=== Results for $appliance ===" -ForegroundColor Cyan
             Write-Host "  Valid Loss: $validLoss" -ForegroundColor White
             Write-Host "  Test MAE:   $testMAE W" -ForegroundColor White
             Write-Host "  Test F1:    $testF1" -ForegroundColor White
@@ -104,7 +104,7 @@ foreach ($appliance in $appliances) {
             # Store failure
             $results += [PSCustomObject]@{
                 Appliance = $appliance
-                Status    = "✗"
+                Status    = "FAIL"
                 ValidLoss = "FAILED"
                 TestMAE   = "FAILED"
                 TestF1    = "FAILED"
@@ -128,7 +128,7 @@ foreach ($appliance in $appliances) {
         # Store skip
         $results += [PSCustomObject]@{
             Appliance = $appliance
-            Status    = "⊘"
+            Status    = "SKIP"
             ValidLoss = "SKIPPED"
             TestMAE   = "SKIPPED"
             TestF1    = "SKIPPED"
@@ -154,8 +154,9 @@ Write-Host "============================================================`n" -For
 Write-Host "`n========== RESULTS SUMMARY TABLE ==========" -ForegroundColor Cyan
 $results | Format-Table -AutoSize -Property Appliance, Status, ValidLoss, TestMAE, TestF1, TestAcc, Duration
 
-Write-Host "`nLegend:" -ForegroundColor Yellow
-Write-Host "  ✓ = Success  |  ✗ = Failed  |  ⊘ = Skipped (No tensors)" -ForegroundColor White
+Write-Host ""
+Write-Host "Legend:" -ForegroundColor Yellow
+Write-Host "  OK = Success  |  FAIL = Failed  |  SKIP = Skipped (No tensors)" -ForegroundColor White
 
 Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
 Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_0/" -ForegroundColor White
