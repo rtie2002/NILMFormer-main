@@ -99,7 +99,7 @@ except Exception as e:
 #####################################
 # Run all possible experiments
 #####################################
-Run-Batch -Datasets $DATASETS_1 -Appliances $APPLIANCES_1 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1
-Run-Batch -Datasets $DATASETS_2 -Appliances $APPLIANCES_2 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1
+# Run-Batch -Datasets $DATASETS_1 -Appliances $APPLIANCES_1 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1  # REFIT - Commented out to run UKDALE first
+Run-Batch -Datasets $DATASETS_2 -Appliances $APPLIANCES_2 -Models $MODELS_1 -WindowSizes $WINDOW_SIZES_1  # UKDALE only
 Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
 Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_0/" -ForegroundColor White
