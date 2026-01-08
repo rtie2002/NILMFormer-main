@@ -42,13 +42,13 @@ foreach ($appliance in $appliances) {
         $startTime = Get-Date
         
         # Capture output to parse metrics
-        $output = python scripts/run_one_direct.py `
+        python scripts/run_one_direct.py `
             --dataset UKDALE `
             --sampling_rate 1min `
             --window_size 256 `
             --appliance $appliance `
             --name_model NILMFormer `
-            --seed 0 2>&1 | Tee-Object -Variable capturedOutput
+            --seed 0 2>&1 | Tee-Object -Variable capturedOutput | Out-Null
         
         $endTime = Get-Date
         $duration = $endTime - $startTime
@@ -90,7 +90,8 @@ foreach ($appliance in $appliances) {
             }
             
             # Display immediate results
-            Write-Host "`n--- Results for $appliance ---" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "--- Results for $appliance ---" -ForegroundColor Cyan
             Write-Host "  Valid Loss: $validLoss" -ForegroundColor White
             Write-Host "  Test MAE:   $testMAE W" -ForegroundColor White
             Write-Host "  Test F1:    $testF1" -ForegroundColor White
