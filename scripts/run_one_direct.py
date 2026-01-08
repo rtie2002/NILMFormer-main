@@ -72,10 +72,11 @@ def launch_one_experiment(expes_config: OmegaConf):
         train_power = torch.load(tensor_dir / 'train_power.pt', weights_only=False).numpy()
         train_state = torch.load(tensor_dir / 'train_state.pt', weights_only=False).numpy()
         
-        valid_agg = torch.load(tensor_dir / 'valid_agg.pt', weights_only=False).numpy()
-        valid_time = torch.load(tensor_dir / 'valid_time.pt', weights_only=False).numpy()
-        valid_power = torch.load(tensor_dir / 'valid_power.pt', weights_only=False).numpy()
-        valid_state = torch.load(tensor_dir / 'valid_state.pt', weights_only=False).numpy()
+        
+        # valid_agg = torch.load(tensor_dir / 'valid_agg.pt', weights_only=False).numpy()
+        # valid_time = torch.load(tensor_dir / 'valid_time.pt', weights_only=False).numpy()
+        # valid_power = torch.load(tensor_dir / 'valid_power.pt', weights_only=False).numpy()
+        # valid_state = torch.load(tensor_dir / 'valid_state.pt', weights_only=False).numpy()
         
         test_agg = torch.load(tensor_dir / 'test_agg.pt', weights_only=False).numpy()
         test_time = torch.load(tensor_dir / 'test_time.pt', weights_only=False).numpy()
@@ -130,22 +131,7 @@ def launch_one_experiment(expes_config: OmegaConf):
         # Set window size manually since we don't have data_builder
         expes_config.window_size = 256
         
-        # CLEAR list_exo_variables to ensure NO fake date features are used!
-        # This forces the pipeline to rely on the tensors (if possible) or at least not add garbage.
-        # Wait, if I clear it, NILMDataset won't add ANY features.
-        # But my tensors have features in channels 2-10.
-        # NILMDataset (original) only reads channel 0 (agg).
-        # So clearing exo variables = NO features = Bad Results?
-        # NO! run_one_expe.py worked with FAKE dates.
-        # So Fake Dates -> Fake Features -> Good Results.
-        # So I MUST NOT CLEAR IT. I must let it compute fake features.
-        
-        # BUT wait! run_one_direct.py FAILED with Fake Dates in Step 710 (0.0028).
-        # What is different? THRESHOLD!
-        # Step 710 likely used default threshold (if data_builder error wasn't hit? Wait, invalid assumption).
-        
-        # Let's fix Threshold to 300 and use Fake Dates.
-        
+
     elif expes_config.dataset == "REFIT":
         data_builder = REFIT_DataBuilder(
             data_path=f"{expes_config.data_path}/REFIT/RAW_DATA_CLEAN/",
