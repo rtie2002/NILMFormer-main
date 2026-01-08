@@ -234,7 +234,7 @@ def launch_one_experiment(expes_config: OmegaConf):
     result_file = f"{expes_config.result_path}.pt"
     if Path(result_file).exists():
         logging.info("\n" + "="*60)
-        logging.info(f"EVALUATION RESULTS: {dataset} - {appliance} - {name_model} (seed {seed})")
+        logging.info(f"EVALUATION RESULTS: {expes_config.dataset} - {expes_config.appliance} - {expes_config.name_model} (seed {expes_config.seed})")
         logging.info("="*60)
         
         try:
