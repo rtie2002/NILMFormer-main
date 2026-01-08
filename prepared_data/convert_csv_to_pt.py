@@ -92,6 +92,11 @@ def compute_status(initial_status, min_on, min_off, min_activation_time):
 
 
 def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size=256, stride=None):
+    # Normalize appliance name (Handle "WashingMachine" -> "washing_machine")
+    appliance_name = appliance_name.lower().replace(' ', '_')
+    if appliance_name == 'washingmachine':
+        appliance_name = 'washing_machine'
+
     if stride is None:
         stride = window_size  # Non-overlapping by default
         
