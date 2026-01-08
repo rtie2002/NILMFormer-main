@@ -1,16 +1,11 @@
 # Global parameters
 $SEEDS = @(0, 1, 2)
 
-$DATASETS_1 = @("REFIT")
-$APPLIANCES_1 = @("WashingMachine", "Dishwasher", "Kettle", "Microwave")
+$DATASETS = @("UKDALE")
+$APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
 
-$DATASETS_2 = @("UKDALE")
-$APPLIANCES_2 = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
-
-$MODELS_1 = @("NILMFormer")
-$WINDOW_SIZES_1 = @("256")
-
-# Removed MODELS_2 and WINDOW_SIZES_2 as they are not needed
+$MODELS = @("NILMFormer")
+$WINDOW_SIZES = @("256")
 
 # Run experiments
 function Run-Batch {
