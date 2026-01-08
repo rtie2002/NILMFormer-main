@@ -184,6 +184,7 @@ def launch_one_experiment(expes_config: OmegaConf):
     scaler.power_stat2 = [0, agg_max]  # Same for power_stat2
     scaler.appliance_stat1 = [0, app_max]  # [min, max] for appliance power
     scaler.appliance_stat2 = [0, app_max]  # Same for appliance_stat2
+    scaler.is_fitted = True  # Mark as fitted so transform() works
     
     # DO NOT call fit_transform - data is already normalized!
     # data = scaler.fit_transform(data)  # REMOVED - would overwrite correct stats
