@@ -137,7 +137,55 @@ def launch_one_experiment(expes_config: OmegaConf):
             st_date,
         )
 
+
     launch_models_training(tuple_data, scaler, expes_config)
+    
+    # Display evaluation results
+    result_file = f"{expes_config.result_path}.pt"
+    if Path(result_file).exists():
+        logging.info("\n" + "="*60)
+        logging.info(f"EVALUATION RESULTS: {dataset} - {appliance} - {name_model} (seed {seed})")
+        logging.info("="*60)
+        
+        try:
+            import torch
+            log = torch.load(result_file, weights_only=False)
+            
+            logging.info('\n--- Test Metrics (Timestamp) ---')
+            if 'test_metrics_timestamp' in log:
+                metrics = log['test_metrics_timestamp']
+                for key, value in metrics.items():
+                    logging.info(f'  {key}: {value:.6f}')
+            
+            logging.info('\n--- Test Metrics (Window) ---')
+            if 'test_metrics_win' in log:
+                metrics = log['test_metrics_win']
+                for key, value in metrics.items():
+                    logging.info(f'  {key}: {value:.6f}')
+            
+            logging.info('\n--- Validation Metrics (Timestamp) ---')
+            if 'valid_metrics_timestamp' in log:
+                metrics = log['valid_metrics_timestamp']
+                for key, value in metrics.items():
+                    logging.info(f'  {key}: {value:.6f}')
+            
+            logging.info('\n--- Training Info ---')
+            if 'epoch_best_loss' in log:
+                logging.info(f'  Best Epoch: {log["epoch_best_loss"]}')
+            if 'value_best_loss' in log:
+                logging.info(f'  Best Loss: {log["value_best_loss"]:.6f}')
+            if 'training_time' in log:
+                logging.info(f'  Training Time: {log["training_time"]:.2f}s')
+            if 'test_metrics_time' in log:
+                logging.info(f'  Test Time: {log["test_metrics_time"]:.2f}s')
+            
+            logging.info("="*60 + "\n")
+                
+        except Exception as e:
+            logging.error(f'Error reading results: {e}')
+    else:
+        logging.warning(f"\nWarning: Result file not found at {result_file}\n")
+
 
 
 def main(dataset, sampling_rate, window_size, appliance, name_model, seed):
