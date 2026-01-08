@@ -1,5 +1,5 @@
 # Global parameters
-$SEEDS = @(0, 1, 2)
+$SEEDS = @(0)
 
 $DATASETS = @("UKDALE")
 $APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
@@ -97,3 +97,6 @@ except Exception as e:
 Run-Batch -Datasets $DATASETS -Appliances $APPLIANCES -Models $MODELS -WindowSizes $WINDOW_SIZES
 Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
 Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_{seed}/" -ForegroundColor White
+
+# Summarize Results
+python scripts\summarize_results.py
