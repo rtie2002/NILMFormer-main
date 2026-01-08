@@ -142,7 +142,7 @@ def nilm_model_training(inst_model, tuple_data, scaler, expes_config):
         test_dataset = NILMDataset(tuple_data[2])
 
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=expes_config.batch_size, shuffle=False
+        train_dataset, batch_size=expes_config.batch_size, shuffle=True
     )
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=1, shuffle=False
