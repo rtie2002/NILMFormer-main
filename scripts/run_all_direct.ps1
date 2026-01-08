@@ -1,29 +1,24 @@
-# Run all UKDALE experiments with train_direct.py (Window Size 256 only)
-# This script runs training for all appliances shown in the paper's Table 2
+# Run all UKDALE experiments with run_one_direct.py (Tensor-based pipeline)
+# This script runs training for all appliances using pre-prepared tensors
 
-# Set epochs to proper value for training
-Write-Host "Setting epochs to 100 in configs/expes.yaml..." -ForegroundColor Cyan
-$configPath = "configs/expes.yaml"
-$config = Get-Content $configPath
-$config = $config -replace "epochs: !!int \d+", "epochs: !!int 100"
-Set-Content $configPath $config
-
-# List of UKDALE appliances from the paper (Table 2)
+# List of UKDALE appliances
 $appliances = @(
-    "dishwasher",
-    "fridge", 
-    "kettle",
-    "microwave",
-    "washing_machine"
+    "Dishwasher",
+    "Fridge", 
+    "Kettle",
+    "Microwave",
+    "WashingMachine"
 )
 
 Write-Host "`n============================================================" -ForegroundColor Green
-Write-Host "UKDALE Experiments - NILMFormer (Window Size 256)" -ForegroundColor Green
+Write-Host "UKDALE Experiments - NILMFormer (Tensor Pipeline)" -ForegroundColor Green
 Write-Host "Total experiments: $($appliances.Count)" -ForegroundColor Green
 Write-Host "============================================================`n" -ForegroundColor Green
 
 $experimentCount = 0
 $totalExperiments = $appliances.Count
+$successCount = 0
+$failCount = 0
 
 foreach ($appliance in $appliances) {
     $experimentCount++
@@ -34,25 +29,33 @@ foreach ($appliance in $appliances) {
     Write-Host "========================================`n" -ForegroundColor Yellow
     
     # Check if prepared tensors exist
-    $tensorDir = "prepared_data/tensors/$appliance"
+    $tensorDir = "prepared_data/tensors/$($appliance.ToLower())"
     
     if (Test-Path $tensorDir) {
         Write-Host "[OK] Found prepared tensors in $tensorDir" -ForegroundColor Green
         
-        # Run training
-        Write-Host "Running: python scripts/train_direct.py --appliance $appliance`n" -ForegroundColor Cyan
+        # Run training with run_one_direct.py
+        Write-Host "Running: python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_size 256 --appliance $appliance --name_model NILMFormer --seed 0`n" -ForegroundColor Cyan
         $startTime = Get-Date
         
-        python scripts/train_direct.py --appliance $appliance
+        python scripts/run_one_direct.py `
+            --dataset UKDALE `
+            --sampling_rate 1min `
+            --window_size 256 `
+            --appliance $appliance `
+            --name_model NILMFormer `
+            --seed 0
         
         $endTime = Get-Date
         $duration = $endTime - $startTime
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "`n[SUCCESS] Completed $appliance in $($duration.ToString('hh\:mm\:ss'))" -ForegroundColor Green
+            $successCount++
         }
         else {
             Write-Host "`n[FAILED] Training failed for $appliance" -ForegroundColor Red
+            $failCount++
             Write-Host "Continue with next experiment? (Y/N)" -ForegroundColor Yellow
             $response = Read-Host
             if ($response -ne "Y" -and $response -ne "y") {
@@ -63,7 +66,8 @@ foreach ($appliance in $appliances) {
     }
     else {
         Write-Host "[ERROR] Tensors not found in $tensorDir" -ForegroundColor Red
-        Write-Host "You need to run: python scripts/convert_csv_to_pt.py --appliance $appliance" -ForegroundColor Yellow
+        Write-Host "You need to run: python prepared_data/convert_csv_to_pt.py --appliance $($appliance.ToLower())" -ForegroundColor Yellow
+        $failCount++
         Write-Host "Skip this experiment? (Y/N)" -ForegroundColor Yellow
         $response = Read-Host
         if ($response -ne "Y" -and $response -ne "y") {
@@ -75,17 +79,10 @@ foreach ($appliance in $appliances) {
 
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "ALL EXPERIMENTS COMPLETED!" -ForegroundColor Green
-Write-Host "Results saved in results/ directory" -ForegroundColor Green
+Write-Host "Success: $successCount | Failed: $failCount | Total: $totalExperiments" -ForegroundColor Green
+Write-Host "Results saved in result/ directory" -ForegroundColor Green
 Write-Host "============================================================`n" -ForegroundColor Green
 
-# Restore epochs to 3 for quick testing
-Write-Host "Restoring epochs to 3 in configs/expes.yaml..." -ForegroundColor Cyan
-$config = Get-Content $configPath
-$config = $config -replace "epochs: !!int \d+", "epochs: !!int 3"
-Set-Content $configPath $config
-
 Write-Host "`nResults summary:" -ForegroundColor Cyan
-Write-Host "  - Check results/{appliance}.pt for each appliance" -ForegroundColor White
-Write-Host "  - Each .pt file contains all metrics (timestamp, window, D/W/M)" -ForegroundColor White
-Write-Host "`nTo view metrics from a saved file:" -ForegroundColor Cyan
-Write-Host '  python -c "import torch; log=torch.load(''results/dishwasher.pt''); print(log[''test_metrics_timestamp''])"' -ForegroundColor White
+Write-Host "  - Check result/UKDALE_{appliance}_1min/256/NILMFormer_0/ for each appliance" -ForegroundColor White
+Write-Host "  - Each directory contains metrics and model checkpoints" -ForegroundColor White

@@ -110,6 +110,20 @@ Script expects these files in `prepared_data/`:
 - `dow_sin`, `dow_cos` - Day of week (cyclical)
 - `month_sin`, `month_cos` - Month of year (cyclical)
 
+- `month_sin`, `month_cos` - Month of year (cyclical)
+
+---
+
+## Validation Strategy (Baseline Replication)
+
+**Recommendation:** To match the baseline results (e.g. 0.0001 loss), you do **NOT** need to manually prepare a validation file.
+
+1.  Put **ALL** your training data into `*_training__realPower.csv`.
+2.  Convert it to `train_agg.pt`, `train_time.pt`, etc.
+3.  Let the training script (`run_one_direct.py`) automatically split this data (e.g., 80% Train, 20% Valid).
+
+This ensures "In-Distribution" validation, which is easier and consistent with the original paper's methodology. Manual validation files (`valid_*.pt`) are treated as "Out-of-Distribution" (seen as unseen houses) and will result in higher loss.
+
 ---
 
 ## Normalization Details
