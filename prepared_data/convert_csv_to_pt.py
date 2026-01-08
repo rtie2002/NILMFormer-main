@@ -11,9 +11,9 @@ APPLIANCE_PARAMS = {
     'dishwasher': {
         'min_threshold': 10,
         'max_threshold': 2500,
-        'min_on_duration': 180,
-        'min_off_duration': 180,
-        'min_activation_time': 12
+        'min_on_duration': 30,  # Adjusted for 1min data (Original 180 @ 10s = 30mins)
+        'min_off_duration': 30, # Adjusted for 1min data (Original 180 @ 10s = 30mins)
+        'min_activation_time': 2 # Adjusted for 1min data (Original 12 @ 10s = 2mins)
     },
     'kettle': {
         'min_threshold': 2000,
@@ -25,22 +25,22 @@ APPLIANCE_PARAMS = {
     'fridge': {
         'min_threshold': 50,
         'max_threshold': 300,
-        'min_on_duration': 6,
+        'min_on_duration': 1, # Adjusted (Original 6 @ 10s = 1min)
         'min_off_duration': 1,
         'min_activation_time': 1
     },
     'washing_machine': {
         'min_threshold': 20,
         'max_threshold': 2500,
-        'min_on_duration': 180,
-        'min_off_duration': 16,
-        'min_activation_time': 12
+        'min_on_duration': 30, # Adjusted (Original 180 @ 10s = 30mins)
+        'min_off_duration': 3,  # Adjusted (Original 16 @ 10s = 2.6mins -> ~3mins)
+        'min_activation_time': 2 # Adjusted (Original 12 @ 10s = 2mins)
     },
     'microwave': {
         'min_threshold': 200,
         'max_threshold': 3000,
         'min_on_duration': 1,
-        'min_off_duration': 3,
+        'min_off_duration': 1, # Adjusted (Original 3 @ 10s = 30s -> 1min)
         'min_activation_time': 1
     }
 }
