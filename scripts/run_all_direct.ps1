@@ -10,6 +10,9 @@ $appliances = @(
     "WashingMachine"
 )
 
+# Results storage
+$results = @()
+
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "UKDALE Experiments - NILMFormer (Tensor Pipeline)" -ForegroundColor Green
 Write-Host "Total experiments: $($appliances.Count)" -ForegroundColor Green
@@ -38,13 +41,14 @@ foreach ($appliance in $appliances) {
         Write-Host "Running: python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_size 256 --appliance $appliance --name_model NILMFormer --seed 0`n" -ForegroundColor Cyan
         $startTime = Get-Date
         
-        python scripts/run_one_direct.py `
+        # Capture output to parse metrics
+        $output = python scripts/run_one_direct.py `
             --dataset UKDALE `
             --sampling_rate 1min `
             --window_size 256 `
             --appliance $appliance `
             --name_model NILMFormer `
-            --seed 0
+            --seed 0 2>&1 | Tee-Object -Variable capturedOutput
         
         $endTime = Get-Date
         $duration = $endTime - $startTime
@@ -52,15 +56,66 @@ foreach ($appliance in $appliances) {
         if ($LASTEXITCODE -eq 0) {
             Write-Host "`n[SUCCESS] Completed $appliance in $($duration.ToString('hh\:mm\:ss'))" -ForegroundColor Green
             $successCount++
+            
+            # Parse metrics from output
+            $testMAE = "N/A"
+            $testF1 = "N/A"
+            $testAcc = "N/A"
+            $validLoss = "N/A"
+            
+            foreach ($line in $capturedOutput) {
+                if ($line -match "Test.*MAE.*:\s*([\d.]+)") {
+                    $testMAE = [math]::Round([double]$matches[1], 2)
+                }
+                if ($line -match "Test.*F1.*:\s*([\d.]+)") {
+                    $testF1 = [math]::Round([double]$matches[1], 4)
+                }
+                if ($line -match "Test.*Accuracy.*:\s*([\d.]+)") {
+                    $testAcc = [math]::Round([double]$matches[1], 4)
+                }
+                if ($line -match "Valid\s+loss\s*:\s*([\d.]+)") {
+                    $validLoss = [math]::Round([double]$matches[1], 6)
+                }
+            }
+            
+            # Store results
+            $results += [PSCustomObject]@{
+                Appliance = $appliance
+                Status    = "✓"
+                ValidLoss = $validLoss
+                TestMAE   = $testMAE
+                TestF1    = $testF1
+                TestAcc   = $testAcc
+                Duration  = $duration.ToString('hh\:mm\:ss')
+            }
+            
+            # Display immediate results
+            Write-Host "`n--- Results for $appliance ---" -ForegroundColor Cyan
+            Write-Host "  Valid Loss: $validLoss" -ForegroundColor White
+            Write-Host "  Test MAE:   $testMAE W" -ForegroundColor White
+            Write-Host "  Test F1:    $testF1" -ForegroundColor White
+            Write-Host "  Test Acc:   $testAcc" -ForegroundColor White
         }
         else {
             Write-Host "`n[FAILED] Training failed for $appliance" -ForegroundColor Red
             $failCount++
+            
+            # Store failure
+            $results += [PSCustomObject]@{
+                Appliance = $appliance
+                Status    = "✗"
+                ValidLoss = "FAILED"
+                TestMAE   = "FAILED"
+                TestF1    = "FAILED"
+                TestAcc   = "FAILED"
+                Duration  = $duration.ToString('hh\:mm\:ss')
+            }
+            
             Write-Host "Continue with next experiment? (Y/N)" -ForegroundColor Yellow
             $response = Read-Host
             if ($response -ne "Y" -and $response -ne "y") {
                 Write-Host "Stopping experiments..." -ForegroundColor Red
-                exit 1
+                break
             }
         }
     }
@@ -68,11 +123,23 @@ foreach ($appliance in $appliances) {
         Write-Host "[ERROR] Tensors not found in $tensorDir" -ForegroundColor Red
         Write-Host "You need to run: python prepared_data/convert_csv_to_pt.py --appliance $($appliance.ToLower())" -ForegroundColor Yellow
         $failCount++
+        
+        # Store skip
+        $results += [PSCustomObject]@{
+            Appliance = $appliance
+            Status    = "⊘"
+            ValidLoss = "SKIPPED"
+            TestMAE   = "SKIPPED"
+            TestF1    = "SKIPPED"
+            TestAcc   = "SKIPPED"
+            Duration  = "00:00:00"
+        }
+        
         Write-Host "Skip this experiment? (Y/N)" -ForegroundColor Yellow
         $response = Read-Host
         if ($response -ne "Y" -and $response -ne "y") {
             Write-Host "Stopping experiments..." -ForegroundColor Red
-            exit 1
+            break
         }
     }
 }
@@ -80,9 +147,14 @@ foreach ($appliance in $appliances) {
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "ALL EXPERIMENTS COMPLETED!" -ForegroundColor Green
 Write-Host "Success: $successCount | Failed: $failCount | Total: $totalExperiments" -ForegroundColor Green
-Write-Host "Results saved in result/ directory" -ForegroundColor Green
 Write-Host "============================================================`n" -ForegroundColor Green
 
-Write-Host "`nResults summary:" -ForegroundColor Cyan
-Write-Host "  - Check result/UKDALE_{appliance}_1min/256/NILMFormer_0/ for each appliance" -ForegroundColor White
-Write-Host "  - Each directory contains metrics and model checkpoints" -ForegroundColor White
+# Display results table
+Write-Host "`n========== RESULTS SUMMARY TABLE ==========" -ForegroundColor Cyan
+$results | Format-Table -AutoSize -Property Appliance, Status, ValidLoss, TestMAE, TestF1, TestAcc, Duration
+
+Write-Host "`nLegend:" -ForegroundColor Yellow
+Write-Host "  ✓ = Success  |  ✗ = Failed  |  ⊘ = Skipped (No tensors)" -ForegroundColor White
+
+Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
+Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_0/" -ForegroundColor White
