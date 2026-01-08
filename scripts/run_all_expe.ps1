@@ -26,7 +26,7 @@ function Run-Batch {
     foreach ($dataset in $Datasets) {
         foreach ($appliance in $Appliances) {
             foreach ($win in $WindowSizes) {
-                foreach ($model in $Moadels) a {
+                foreach ($model in $Models) {
                     foreach ($seed in $SEEDS) {
                         Write-Host "Running: python -m scripts.run_one_expe --dataset $dataset --sampling_rate 1min --appliance $appliance --window_size $win --name_model $model --seed $seed"
                         
