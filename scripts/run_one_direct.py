@@ -180,10 +180,11 @@ def launch_one_experiment(expes_config: OmegaConf):
     
     # Manually set the scaler statistics to the ORIGINAL values (not fitted on normalized data)
     # This ensures metrics are denormalized correctly to Watts
-    scaler.power_stat1 = [0, agg_max]  # [min, max] for aggregate power
-    scaler.power_stat2 = [0, agg_max]  # Same for power_stat2
-    scaler.appliance_stat1 = [0, app_max]  # [min, max] for appliance power
-    scaler.appliance_stat2 = [0, app_max]  # Same for appliance_stat2
+    scaler.power_stat1 = 0  # Min for aggregate power (scalar)
+    scaler.power_stat2 = agg_max  # Max for aggregate power (scalar)
+    scaler.appliance_stat1 = [0]  # Min for appliance power (list with one element)
+    scaler.appliance_stat2 = [app_max]  # Max for appliance power (list with one element)
+    scaler.n_appliance = 1  # Number of appliances
     scaler.is_fitted = True  # Mark as fitted so transform() works
     
     # DO NOT call fit_transform - data is already normalized!
