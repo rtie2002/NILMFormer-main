@@ -163,14 +163,32 @@ def launch_one_experiment(expes_config: OmegaConf):
 
     logging.info("             ... Done.")
 
+
+    # CRITICAL FIX: Load correct scaler statistics from stats.pt
+    # The tensor data is already normalized (0-1), so fit_transform would learn max=1.0
+    # We need the ORIGINAL max values to denormalize metrics back to Watts
+    stats = torch.load(tensor_dir / 'stats.pt', weights_only=False)
+    agg_max = stats['agg_max']
+    app_max = stats['app_max']
+    
+    logging.info(f"Loaded scaler stats: agg_max={agg_max:.2f}W, app_max={app_max:.2f}W")
+    
     scaler = NILMscaler(
         power_scaling_type=expes_config.power_scaling_type,
         appliance_scaling_type=expes_config.appliance_scaling_type,
     )
-    # Ensure fit_transform runs!
-    data = scaler.fit_transform(data)
+    
+    # Manually set the scaler statistics to the ORIGINAL values (not fitted on normalized data)
+    # This ensures metrics are denormalized correctly to Watts
+    scaler.power_stat1 = [0, agg_max]  # [min, max] for aggregate power
+    scaler.power_stat2 = [0, agg_max]  # Same for power_stat2
+    scaler.appliance_stat1 = [0, app_max]  # [min, max] for appliance power
+    scaler.appliance_stat2 = [0, app_max]  # Same for appliance_stat2
+    
+    # DO NOT call fit_transform - data is already normalized!
+    # data = scaler.fit_transform(data)  # REMOVED - would overwrite correct stats
 
-    expes_config.cutoff = float(scaler.appliance_stat2[0])
+    expes_config.cutoff = float(app_max)  # Use actual max, not normalized max
     
     # CORRECT THRESHOLD ASSIGNMENT (Critical Fix)
     # Default UKDALE_DataBuilder uses NO Kelly Paper = Threshold 300W for Dishwasher.
