@@ -45,12 +45,7 @@ def launch_one_experiment(expes_config: OmegaConf):
         import torch
         from pathlib import Path
         
-        # Normalize appliance name for directory lookup (e.g. WashingMachine -> washing_machine)
-        app_name = expes_config.app.lower().replace(" ", "_")
-        if app_name == 'washingmachine': 
-            app_name = 'washing_machine'
-            
-        tensor_dir = Path(f'prepared_data/tensors/{app_name}')
+        tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
         logging.info(f"Loading tensors from {tensor_dir}")
         
         # Load all tensors

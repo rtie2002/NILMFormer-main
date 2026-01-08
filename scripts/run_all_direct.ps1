@@ -2,7 +2,7 @@
 $SEEDS = @(0)
 
 $DATASETS = @("UKDALE")
-$APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
+$APPLIANCES = @("washing_machine", "dishwasher", "kettle", "microwave", "fridge")
 
 $MODELS = @("NILMFormer")
 $WINDOW_SIZES = @("256")
