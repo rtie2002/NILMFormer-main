@@ -95,8 +95,15 @@ except Exception as e:
 # Run all possible experiments
 #####################################
 Run-Batch -Datasets $DATASETS -Appliances $APPLIANCES -Models $MODELS -WindowSizes $WINDOW_SIZES
+
 Write-Host "`nDetailed results saved in:" -ForegroundColor Cyan
 Write-Host "  result/UKDALE_{appliance}_1min/256/NILMFormer_{seed}/" -ForegroundColor White
+
+Write-Host "`n========================================" -ForegroundColor Magenta
+Write-Host "       FINAL SUMMARY OF RESULTS       " -ForegroundColor Magenta
+Write-Host "========================================" -ForegroundColor Magenta
+python scripts\summarize_results.py
+Write-Host "`n========================================`n" -ForegroundColor Magenta
 
 # Summarize Results
 python scripts\summarize_results.py
