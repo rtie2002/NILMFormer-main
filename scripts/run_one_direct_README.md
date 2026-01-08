@@ -29,6 +29,7 @@ python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_
 python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_size 256 --appliance Dishwasher --name_model NILMFormer --seed 0
 ```
 
+
 **Fridge:**
 ```powershell
 python scripts/run_one_direct.py --dataset UKDALE --sampling_rate 1min --window_size 256 --appliance Fridge --name_model NILMFormer --seed 0
