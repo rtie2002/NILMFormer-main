@@ -658,23 +658,26 @@ class NILMDataset(torch.utils.data.Dataset):
                 np.std(tmp_sample, axis=1, keepdims=True) + 1e-9
             )
 
-        # CRITICAL FIX: Use pre-loaded time features if available (channels 2-9)
-        # This preserves time features from train_time.pt instead of regenerating
+        # CRITICAL FIX: Support both pre-loaded time features AND on-the-fly generation
+        # Decision logic:
+        # - If self.st_date is None → Use pre-loaded time features (run_one_direct.py)
+        # - If self.st_date is not None → Generate from st_date (run_one_expe.py)
         if self.n_var is not None:
-            # Check if time features already exist in the 4D array (channels 2-9)
-            # Shape of self.samples: (N, 2, 10, L) where channels 2-9 contain time features
-            if self.samples.shape[2] >= 10:  # Has 10 channels (0=agg, 1=empty, 2-9=time)
-                # Extract pre-loaded time features from channels 2-9
-                preloaded_time = self.samples[idx, 0, 2:10, :].copy()
-                # Check if these channels contain actual data (not all zeros)
-                if np.any(preloaded_time != 0):
-                    exo = preloaded_time
+            if self.st_date is None:
+                # Case 1: run_one_direct.py - Use pre-loaded time features
+                if self.samples.shape[2] >= 10:
+                    preloaded_time = self.samples[idx, 0, 2:10, :].copy()
+                    if np.any(preloaded_time != 0):
+                        exo = preloaded_time  # Use YOUR pre-loaded data
+                    else:
+                        # Fallback: channels are empty, but we have no st_date to generate
+                        raise ValueError("st_date is None but no pre-loaded time features found in channels 2-9")
                 else:
-                    # Fallback: generate from st_date if channels are empty
-                    exo = self._create_exogene(idx)
+                    raise ValueError("st_date is None but data array doesn't have 10 channels for time features")
             else:
-                # Fallback: generate from st_date if array doesn't have time channels
-                exo = self._create_exogene(idx)
+                # Case 2: run_one_expe.py - Generate from st_date
+                exo = self._create_exogene(idx)  # Generate on-the-fly
+            
             tmp_sample = np.concatenate((tmp_sample, exo), axis=0)
 
         if self.cam is not None:
