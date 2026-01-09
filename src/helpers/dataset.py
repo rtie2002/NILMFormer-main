@@ -523,17 +523,26 @@ class NILMDataset(torch.utils.data.Dataset):
         self.list_exo_variables = list_exo_variables
 
         if len(list_exo_variables) > 0:
-            assert st_date is not None, (
-                "list_exo_variables provided but st_date is None: please provide st_date information to compute exogene variable."
-            )
-            assert freq is not None, (
-                "Variable freq is None but list_exo_variables provided: please set freq according to data sampling rate."
-            )
-            assert mask_date is not None, (
-                "Variable mask_date is None but list_exo_variables provided: please choose freq according to data sampling rate."
-            )
-
-            self.st_date = st_date[mask_date].values.flatten()
+            # Check if time features are pre-loaded in the 4D array (channels 2-9)
+            has_preloaded_time = X.shape[2] >= 10 and np.any(X[:, 0, 2:10, :] != 0)
+            
+            # Allow st_date=None if time features are already in the data
+            if not has_preloaded_time:
+                assert st_date is not None, (
+                    "list_exo_variables provided but st_date is None and no pre-loaded time features found. "
+                    "Please provide st_date information OR ensure time features exist in channels 2-9 of the input array."
+                )
+                assert freq is not None, (
+                    "Variable freq is None but list_exo_variables provided: please set freq according to data sampling rate."
+                )
+                assert mask_date is not None, (
+                    "Variable mask_date is None but list_exo_variables provided: please choose freq according to data sampling rate."
+                )
+                self.st_date = st_date[mask_date].values.flatten()
+            else:
+                # Using pre-loaded time features from channels 2-9
+                self.st_date = None
+                logging.info("Using pre-loaded time features from input array (channels 2-9)")
 
             if self.cosinbase:
                 self.n_var = 2 * len(self.list_exo_variables)
