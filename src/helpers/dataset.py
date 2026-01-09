@@ -660,6 +660,8 @@ class NILMDataset(torch.utils.data.Dataset):
 
         # CRITICAL FIX: Use pre-loaded time features if available (channels 2-9)
         # This preserves time features from train_time.pt instead of regenerating
+
+
         if self.n_var is not None:
             # Check if time features already exist in the 4D array (channels 2-9)
             # Shape of self.samples: (N, 2, 10, L) where channels 2-9 contain time features
@@ -669,15 +671,19 @@ class NILMDataset(torch.utils.data.Dataset):
                 # Check if these channels contain actual data (not all zeros)
                 if np.any(preloaded_time != 0):
                     exo = preloaded_time
+
                 else:
                     # Fallback: generate from st_date if channels are empty
                     exo = self._create_exogene(idx)
             else:
                 # Fallback: generate from st_date if array doesn't have time channels
                 exo = self._create_exogene(idx)
+
             tmp_sample = np.concatenate((tmp_sample, exo), axis=0)
 
         if self.cam is not None:
+
+
             tmp_sample = np.concatenate((tmp_sample, self.cam[idx, :, :]), axis=0)
 
         if self.pretraining:
