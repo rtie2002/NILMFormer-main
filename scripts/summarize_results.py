@@ -29,6 +29,9 @@ def main():
                             appliance = dataset_app.split("_")[1] # Extract appliance name
                         else:
                             appliance = dataset_app
+                        
+                        # parts[2] is the window size
+                        window = parts[2]
                             
                         filename = file.replace(".pt", "")
                         if "_" in filename:
@@ -56,10 +59,11 @@ def main():
                         
                         results.append({
                             "Appliance": appliance,
+                            "Window": window,
                             "Model": model,
                             "Seed": seed,
-                            "MAE (W)": mae,
-                            "MR (Acc)": mr
+                            "MAE": mae,
+                            "MR": mr
                         })
                         
                     except Exception as e:
@@ -68,8 +72,8 @@ def main():
     # Display Table
     if results:
         df = pd.DataFrame(results)
-        # Sort for better readability
-        df = df.sort_values(by=["Appliance", "Model", "Seed"])
+        # Sort for better readability (by Appliance, then Window size)
+        df = df.sort_values(by=["Appliance", "Window", "Model", "Seed"])
         
         # Print using pandas to string for nice formatting
         print(df.to_string(index=False))
