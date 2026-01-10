@@ -5,7 +5,7 @@ $DATASETS = @("UKDALE")
 $APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
 
 $MODELS = @("NILMFormer")
-$WINDOW_SIZES = @("126", "256", "512")
+$WINDOW_SIZES = @("128", "256", "512")
 
 # Run experiments
 function Run-Batch {

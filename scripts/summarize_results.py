@@ -75,8 +75,23 @@ def main():
         # Sort for better readability (by Appliance, then Window size)
         df = df.sort_values(by=["Appliance", "Window", "Model", "Seed"])
         
-        # Print using pandas to string for nice formatting
-        print(df.to_string(index=False))
+        # Print with separation lines between appliances
+        print()
+        current_appliance = None
+        for idx, row in df.iterrows():
+            if current_appliance != row['Appliance']:
+                if current_appliance is not None:
+                    print("-" * 80)
+                current_appliance = row['Appliance']
+                # Print header for first row or after separator
+                if idx == df.index[0] or current_appliance != df.iloc[df.index.get_loc(idx) - 1]['Appliance']:
+                    print(f"{'Appliance':<15} {'Window':<10} {'Model':<15} {'Seed':<8} {'MAE':<12} {'MR':<12}")
+            
+            # Format the values
+            mae_str = f"{row['MAE']:.1f}" if isinstance(row['MAE'], (int, float)) else str(row['MAE'])
+            mr_str = f"{row['MR']:.3f}" if isinstance(row['MR'], (int, float)) else str(row['MR'])
+            
+            print(f"{row['Appliance']:<15} {row['Window']:<10} {row['Model']:<15} {row['Seed']:<8} {mae_str:<12} {mr_str:<12}")
         
         print("\n" + "="*80)
         print("Note: MR displayed as ACCURACY if explicit MR is missing.")
