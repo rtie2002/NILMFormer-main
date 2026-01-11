@@ -431,6 +431,9 @@ if __name__ == "__main__":
         "--name_model", required=True, type=str, help="Name of the model for training."
     )
     parser.add_argument(
+        "--seed", required=True, type=int, help="Random seed for reproducibility."
+    )
+    parser.add_argument(
         "--synthetic_pct", required=False, type=str, default=None, help="Percentage of synthetic data (0%, 25%, etc)."
     )
 
