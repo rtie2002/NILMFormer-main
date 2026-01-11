@@ -45,25 +45,7 @@ def launch_one_experiment(expes_config: OmegaConf):
         import torch
         from pathlib import Path
         
-        # Robust Path Handling for Washing Machine (washingmachine vs washing_machine)
-        app_name = expes_config.app.lower()
-        base_tensor_path = Path('prepared_data/tensors')
-        
-        # Check explicit path first
-        if (base_tensor_path / app_name).exists():
-            tensor_dir = base_tensor_path / app_name
-        elif (base_tensor_path / app_name.replace(" ", "_")).exists():
-            tensor_dir = base_tensor_path / app_name.replace(" ", "_")
-        elif (base_tensor_path / app_name.replace("_", "")).exists():
-             tensor_dir = base_tensor_path / app_name.replace("_", "")
-        # Specific fix for typical mismatch
-        elif app_name == "washingmachine" and (base_tensor_path / "washing_machine").exists():
-            tensor_dir = base_tensor_path / "washing_machine"
-        elif app_name == "washing_machine" and (base_tensor_path / "washingmachine").exists():
-            tensor_dir = base_tensor_path / "washingmachine"
-        else:
-             # Fallback
-             tensor_dir = base_tensor_path / app_name
+        tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
         logging.info(f"Loading tensors from {tensor_dir}")
         
         # Load all tensors
