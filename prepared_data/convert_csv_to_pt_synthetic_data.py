@@ -123,16 +123,21 @@ def convert_appliance_data(appliance_name, synthetic_pct, data_dir='prepared_dat
     output_dir = base_path / 'tensors' / str(window_size) / appliance_name / synthetic_pct
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Handle filename mismatch for washing machine
+    filename_appliance = appliance_name
+    if appliance_name == 'washing_machine':
+        filename_appliance = 'washingmachine'
+    
     # Determine training file based on synthetic percentage
     if synthetic_pct == "0%":
-        train_file = base_path / f"{appliance_name}_training__realPower.csv"
+        train_file = base_path / f"{filename_appliance}_training__realPower.csv"
     else:
-        train_file = base_path / f"{appliance_name}_training_synthetic_{synthetic_pct}_realPower.csv"
+        train_file = base_path / f"{filename_appliance}_training_synthetic_{synthetic_pct}_realPower.csv"
     
     # Files - test is always the same (NO VALIDATION FILE - it's split from training at runtime)
     files = {
         'train': train_file,
-        'test': base_path / f"{appliance_name}_test__realPower.csv"
+        'test': base_path / f"{filename_appliance}_test__realPower.csv"
     }
     
     print(f"\nData files:")
