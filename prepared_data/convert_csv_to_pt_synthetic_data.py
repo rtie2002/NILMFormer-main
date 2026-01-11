@@ -91,13 +91,19 @@ def compute_status(initial_status, min_on, min_off, min_activation_time):
     return tmp_status
 
 
-def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size=256, stride=None):
+def convert_appliance_data(appliance_name, synthetic_pct, data_dir='prepared_data', window_size=256, stride=None):
+    """
+    Convert CSV data to PyTorch tensors for a specific appliance and synthetic percentage.
+    
+    Folder structure: prepared_data/tensors/{window_size}/{appliance}/{synthetic_pct}/
+    Example: prepared_data/tensors/256/dishwasher/0%/
+    """
     if stride is None:
         stride = window_size  # Non-overlapping by default
         
-    print(f"\n{'='*50}")
-    print(f"Processing Appliance: {appliance_name}")
-    print(f"{'='*50}")
+    print(f"\n{'='*60}")
+    print(f"Processing: {appliance_name} | Window: {window_size} | Synthetic: {synthetic_pct}")
+    print(f"{'='*60}")
 
     # Get appliance parameters
     if appliance_name not in APPLIANCE_PARAMS:
@@ -109,23 +115,32 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
     print(f"Using NILMFormer parameters:")
     print(f"  Min threshold: {params['min_threshold']} W")
     print(f"  Max threshold: {params['max_threshold']} W")
-    print(f"  Min ON: {params['min_on_duration']} samples (10s each)")
+    print(f"  Min ON: {params['min_on_duration']} samples")
     print(f"  Min OFF: {params['min_off_duration']} samples")
 
-    # Paths
+    # Paths - NEW STRUCTURE: window_size/appliance/synthetic_pct
     base_path = Path(data_dir)
-    output_dir = base_path / 'tensors' / appliance_name
+    output_dir = base_path / 'tensors' / str(window_size) / appliance_name / synthetic_pct
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Files
+    # Determine training file based on synthetic percentage
+    if synthetic_pct == "0%":
+        train_file = base_path / f"{appliance_name}_training__realPower.csv"
+    else:
+        train_file = base_path / f"{appliance_name}_training_synthetic_{synthetic_pct}_realPower.csv"
+    
+    # Files - test is always the same (NO VALIDATION FILE - it's split from training at runtime)
     files = {
-        'train': base_path / f"{appliance_name}_training__realPower.csv",
-        'valid': base_path / f"{appliance_name}_validation__realPower.csv",
+        'train': train_file,
         'test': base_path / f"{appliance_name}_test__realPower.csv"
     }
     
+    print(f"\nData files:")
+    print(f"  Train: {files['train'].name}")
+    print(f"  Test:  {files['test'].name}")
+    
     # 1. Load Training Data first to calc Stats
-    print(f"Loading Training data for stats calculation...")
+    print(f"\nLoading Training data for stats calculation...")
     if not files['train'].exists():
         print(f"[ERROR] Training file not found: {files['train']}")
         return
@@ -152,8 +167,7 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
     print(f"[OK] Identified appliance column: '{app_col}'")
 
     # Calculate Stats (MaxScaling - same as NILMFormer)
-    # CRITICAL: Must calculate from ALL data (train+valid+test) BEFORE normalization
-    # This matches run_one_expe.py Line 90-94 which does scaler.fit_transform(ALL_DATA)
+    # CRITICAL: Must calculate from ALL data (train+test) BEFORE normalization
     print("\n[STEP 1] Loading ALL splits to calculate global stats...")
     
     all_dfs = []
@@ -162,6 +176,12 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
             df_split = pd.read_csv(file_path)
             all_dfs.append(df_split)
             print(f"  Loaded {split_name}: {len(df_split)} rows")
+        else:
+            print(f"  [WARNING] {split_name} file not found: {file_path}")
+    
+    if not all_dfs:
+        print("[ERROR] No data files found!")
+        return
     
     # Concatenate ALL data
     df_all = pd.concat(all_dfs, ignore_index=True)
@@ -171,10 +191,9 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
     agg_max = df_all['aggregate'].max()
     app_max = df_all[app_col].max()
     
-    print(f"\n[STEP 2] Global Stats (from ALL data - train+valid+test):")
+    print(f"\n[STEP 2] Global Stats (from ALL data - train+test):")
     print(f"  Agg max: {agg_max:.2f} W")
     print(f"  App max: {app_max:.2f} W")
-    print(f"  (This matches run_one_expe.py which fits scaler on all data)")
     
     # Save stats for scaler
     stats = {
@@ -185,7 +204,7 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
 
     # 2. Process each split
     for split_name, file_path in files.items():
-        print(f"\nProcessing {split_name}...")
+        print(f"\n[STEP 3] Processing {split_name}...")
         if not file_path.exists():
             print(f"[WARNING] {split_name} file not found. Skipping.")
             continue
@@ -258,12 +277,51 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
         torch.save(torch.from_numpy(target_power), output_dir / f'{split_name}_power.pt')
         torch.save(torch.from_numpy(target_state), output_dir / f'{split_name}_state.pt')
         
-        print(f"  [OK] Saved {split_name} tensors to {output_dir}")
+        print(f"  [OK] Saved {split_name} tensors")
+    
+    print(f"\n[COMPLETE] All tensors saved to: {output_dir}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--appliance', type=str, required=True, help='Appliance name (e.g., dishwasher)')
-    parser.add_argument('--window_size', type=int, default=256)
+    parser = argparse.ArgumentParser(description='Convert CSV to PyTorch tensors for synthetic data experiments')
+    parser.add_argument('--appliance', type=str, help='Appliance name (e.g., dishwasher). If not specified, processes all.')
+    parser.add_argument('--window_size', type=int, help='Window size (e.g., 128, 256, 512). If not specified, processes all.')
+    parser.add_argument('--synthetic_pct', type=str, help='Synthetic percentage (0%, 25%, 50%, 100%). If not specified, processes all.')
+    parser.add_argument('--all', action='store_true', help='Process all combinations (5 appliances × 3 windows × 4 percentages = 60 experiments)')
     args = parser.parse_args()
     
-    convert_appliance_data(args.appliance, window_size=args.window_size)
+    # Define all possible values
+    all_appliances = ['dishwasher', 'fridge', 'kettle', 'microwave', 'washing_machine']
+    all_windows = [128, 256, 512]
+    all_percentages = ['0%', '25%', '50%', '100%']
+    
+    # Determine what to process
+    if args.all:
+        appliances = all_appliances
+        windows = all_windows
+        percentages = all_percentages
+        print("\n" + "="*60)
+        print("PROCESSING ALL COMBINATIONS")
+        print(f"Total experiments: {len(appliances)} × {len(windows)} × {len(percentages)} = {len(appliances)*len(windows)*len(percentages)}")
+        print("="*60)
+    else:
+        appliances = [args.appliance] if args.appliance else all_appliances
+        windows = [args.window_size] if args.window_size else all_windows
+        percentages = [args.synthetic_pct] if args.synthetic_pct else all_percentages
+    
+    # Process all combinations
+    total = len(appliances) * len(windows) * len(percentages)
+    current = 0
+    
+    for appliance in appliances:
+        for window in windows:
+            for pct in percentages:
+                current += 1
+                print(f"\n{'#'*60}")
+                print(f"Progress: {current}/{total}")
+                print(f"{'#'*60}")
+                convert_appliance_data(appliance, pct, window_size=window)
+    
+    print("\n" + "="*60)
+    print("ALL CONVERSIONS COMPLETE!")
+    print("="*60)
+

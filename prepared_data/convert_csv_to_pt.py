@@ -94,33 +94,17 @@ def compute_status(initial_status, min_on, min_off, min_activation_time):
 def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size=256, stride=None):
     if stride is None:
         stride = window_size  # Non-overlapping by default
-    
-    # CRITICAL FIX: Map appliance argument names to correct folder names
-    # This ensures consistency with datasets.yaml expectations
-    FOLDER_NAME_MAPPING = {
-        'washingmachine': 'washingmachine',
-        'washing_machine': 'washingmachine',
-        'dishwasher': 'dishwasher',
-        'kettle': 'kettle',
-        'microwave': 'microwave',
-        'fridge': 'fridge'
-    }
-    
-    # Use mapped folder name if available, otherwise use appliance_name as-is
-    folder_name = FOLDER_NAME_MAPPING.get(appliance_name.lower(), appliance_name.lower())
         
     print(f"\n{'='*50}")
     print(f"Processing Appliance: {appliance_name}")
-    print(f"Output folder: {folder_name}")
     print(f"{'='*50}")
 
-    # Get appliance parameters (use original appliance_name for param lookup)
-    param_key = appliance_name.lower()
-    if param_key not in APPLIANCE_PARAMS:
+    # Get appliance parameters
+    if appliance_name not in APPLIANCE_PARAMS:
         print(f"[WARNING] No parameters found for '{appliance_name}'. Using dishwasher defaults.")
         params = APPLIANCE_PARAMS['dishwasher']
     else:
-        params = APPLIANCE_PARAMS[param_key]
+        params = APPLIANCE_PARAMS[appliance_name]
     
     print(f"Using NILMFormer parameters:")
     print(f"  Min threshold: {params['min_threshold']} W")
@@ -128,9 +112,9 @@ def convert_appliance_data(appliance_name, data_dir='prepared_data', window_size
     print(f"  Min ON: {params['min_on_duration']} samples (10s each)")
     print(f"  Min OFF: {params['min_off_duration']} samples")
 
-    # Paths - use mapped folder_name instead of appliance_name
+    # Paths
     base_path = Path(data_dir)
-    output_dir = base_path / 'tensors' / folder_name
+    output_dir = base_path / 'tensors' / appliance_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Files

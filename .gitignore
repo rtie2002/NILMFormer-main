@@ -15,6 +15,5 @@ example/
 *.csv
 *.dat
 *.pt
-/prepared_data
-*.pt
-/prepared_data
+
+
