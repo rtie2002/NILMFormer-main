@@ -45,7 +45,13 @@ def launch_one_experiment(expes_config: OmegaConf):
         import torch
         from pathlib import Path
         
-        tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
+        if 'synthetic_pct' in expes_config and expes_config.synthetic_pct is not None:
+            # Synthetic data path: prepared_data/tensors/{window_size}/{app}/{synthetic_pct}
+            tensor_dir = Path(f'prepared_data/tensors/{expes_config.window_size}/{expes_config.app.lower()}/{expes_config.synthetic_pct}')
+        else:
+            # Standard data path
+            tensor_dir = Path(f'prepared_data/tensors/{expes_config.app.lower()}')
+            
         logging.info(f"Loading tensors from {tensor_dir}")
         
         # Load all tensors
@@ -289,7 +295,7 @@ def launch_one_experiment(expes_config: OmegaConf):
         logging.warning(f"\nWarning: Result file not found at {result_file}\n")
 
 
-def main(dataset, sampling_rate, window_size, appliance, name_model, seed):
+def main(dataset, sampling_rate, window_size, appliance, name_model, seed, synthetic_pct=None):
     """
     Main function to load configuration, update it with parameters,
     and launch an experiment.
@@ -301,6 +307,7 @@ def main(dataset, sampling_rate, window_size, appliance, name_model, seed):
         appliance (str): Selected appliance.
         name_model (str): Name of the model to use for the experiment.
         seed (int): Random seed for reproducibility.
+        synthetic_pct (str): Percentage of synthetic data (optional).
     """
 
     # Attempt to convert window_size to int
@@ -361,6 +368,8 @@ def main(dataset, sampling_rate, window_size, appliance, name_model, seed):
     logging.info("      Appliance : %s", appliance)
     logging.info("      Model: %s", name_model)
     logging.info("      Seed: %s", seed)
+    if synthetic_pct:
+        logging.info("      Synthetic Pct: %s", synthetic_pct)
     logging.info("--------------------------------------------------")
 
     # Update experiment config with passed parameters
@@ -370,10 +379,17 @@ def main(dataset, sampling_rate, window_size, appliance, name_model, seed):
     expes_config["sampling_rate"] = sampling_rate
     expes_config["seed"] = seed
     expes_config["name_model"] = name_model
+    expes_config["synthetic_pct"] = synthetic_pct
 
     # Create directories for results
     result_path = create_dir(expes_config["result_path"])
-    result_path = create_dir(f"{result_path}{dataset}_{appliance}_{sampling_rate}/")
+    
+    # Path with synthetic percentage if provided
+    if synthetic_pct:
+        result_path = create_dir(f"{result_path}{dataset}_{appliance}_{sampling_rate}_{synthetic_pct}/")
+    else:
+        result_path = create_dir(f"{result_path}{dataset}_{appliance}_{sampling_rate}/")
+        
     result_path = create_dir(f"{result_path}{window_size}/")
 
     # Cast to OmegaConf
@@ -415,7 +431,7 @@ if __name__ == "__main__":
         "--name_model", required=True, type=str, help="Name of the model for training."
     )
     parser.add_argument(
-        "--seed", required=True, type=int, help="Random seed for reproducibility."
+        "--synthetic_pct", required=False, type=str, default=None, help="Percentage of synthetic data (0%, 25%, etc)."
     )
 
     args = parser.parse_args()
@@ -426,4 +442,5 @@ if __name__ == "__main__":
         appliance=args.appliance,
         name_model=args.name_model,
         seed=args.seed,
+        synthetic_pct=args.synthetic_pct
     )

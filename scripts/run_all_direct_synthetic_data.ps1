@@ -25,10 +25,10 @@ function Run-Batch {
                     foreach ($model in $Models) {
                         foreach ($seed in $SEEDS) {
                             Write-Host "`n========================================" -ForegroundColor Cyan
-                            Write-Host "Running: python scripts\run_one_direct_synthetic.py --dataset $dataset --sampling_rate 1min --appliance $appliance --window_size $win --name_model $model --seed $seed --synthetic_pct $synth_pct" -ForegroundColor Yellow
+                            Write-Host "Running: python scripts\run_one_direct.py --dataset $dataset --sampling_rate 1min --appliance $appliance --window_size $win --name_model $model --seed $seed --synthetic_pct $synth_pct" -ForegroundColor Yellow
                             Write-Host "========================================`n" -ForegroundColor Cyan
                             
-                            python scripts\run_one_direct_synthetic.py `
+                            python scripts\run_one_direct.py `
                                 --dataset "$dataset" `
                                 --sampling_rate "1min" `
                                 --appliance "$appliance" `
