@@ -126,7 +126,8 @@ def launch_one_experiment(expes_config: OmegaConf):
         st_date = None
         
         # Set window size manually since we don't have data_builder
-        expes_config.window_size = 256
+        # expes_config.window_size is already set correctly from args
+        pass
         
 
     elif expes_config.dataset == "REFIT":

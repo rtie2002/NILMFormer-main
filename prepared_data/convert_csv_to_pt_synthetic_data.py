@@ -172,31 +172,40 @@ def convert_appliance_data(appliance_name, synthetic_pct, data_dir='prepared_dat
     print(f"[OK] Identified appliance column: '{app_col}'")
 
     # Calculate Stats (MaxScaling - same as NILMFormer)
-    # CRITICAL: Must calculate from ALL data (train+test) BEFORE normalization
-    print("\n[STEP 1] Loading ALL splits to calculate global stats...")
+    # CRITICAL: We must calculate stats from REAL Data (Real Train + Real Test) ONLY.
+    # We should NOT let Synthetic Data outliers distort the scaling factor.
+    # This keeps normalization consistent across 0%, 25%, 100% experiments.
+    
+    print("\n[STEP 1] Loading REAL data stats (to ensure consistent scaling)...")
+    
+    real_train_file = base_path / f"{filename_appliance}_training__realPower.csv"
+    
+    stats_files = {
+        'real_train': real_train_file,
+        'test': files['test']
+    }
     
     all_dfs = []
-    for split_name, file_path in files.items():
+    for split_name, file_path in stats_files.items():
         if file_path.exists():
             df_split = pd.read_csv(file_path)
             all_dfs.append(df_split)
             print(f"  Loaded {split_name}: {len(df_split)} rows")
         else:
-            print(f"  [WARNING] {split_name} file not found: {file_path}")
+            print(f"  [WARNING] {split_name} file not found for stats: {file_path}")
     
     if not all_dfs:
-        print("[ERROR] No data files found!")
+        print("[ERROR] No data files found for stats!")
         return
     
     # Concatenate ALL data
     df_all = pd.concat(all_dfs, ignore_index=True)
-    print(f"  Combined: {len(df_all)} total rows")
     
-    # Calculate global max from ALL data (NOT just training!)
+    # Calculate global max from REAL data
     agg_max = df_all['aggregate'].max()
     app_max = df_all[app_col].max()
     
-    print(f"\n[STEP 2] Global Stats (from ALL data - train+test):")
+    print(f"\n[STEP 2] Global Stats (Locked to REAL Data distribution):")
     print(f"  Agg max: {agg_max:.2f} W")
     print(f"  App max: {app_max:.2f} W")
     
