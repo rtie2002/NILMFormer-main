@@ -81,30 +81,70 @@ def main():
     # Display Table
     if results:
         df = pd.DataFrame(results)
-        # Sort for better readability (by Appliance, Synthetic %, then Window size)
-        df = df.sort_values(by=["Appliance", "Synthetic", "Window", "Model", "Seed"])
         
-        # Print with separation lines between appliances
-        print()
+        # Ensure Synthetic is categorical for proper numeric sorting (0, 25, 50, 100)
+        # Create a numeric helper to sort "25%" correctly vs "100%"
+        def parse_pct(s):
+            return int(s.replace('%', '')) if s != '?' else -1
+            
+        df['SynthNum'] = df['Synthetic'].apply(parse_pct)
+        
+        # Get unique window sizes sorted numerically
+        windows = sorted(df['Window'].unique(), key=lambda x: int(x))
+        
+        # Pivot the data: Index=[Appliance, Synthetic], Columns=[Window], Values=[MAE, MR]
+        # We'll construct the display manually for full control
+        
+        # Sort rows: Appliance, then Synthetic %
+        df = df.sort_values(by=["Appliance", "SynthNum"])
+        
+        # Get unique keys for rows
+        row_keys = df[['Appliance', 'Synthetic', 'SynthNum']].drop_duplicates().values
+        
+        print("\n" + "="*120)
+        # Build Header
+        header_top = f"{'Appliance':<15} {'Synthetic':<10}"
+        header_bot = f"{'':<15} {'':<10}"
+        
+        for w in windows:
+            header_top += f" | {'Window (' + str(w) + ')':^24}" # Center "Window (128)"
+            header_bot += f" | {'MAE':^11} {'MR':^11}"
+            
+        print(header_top)
+        print(header_bot)
+        print("="*120)
+        
         current_appliance = None
-        for idx, row in df.iterrows():
-            if current_appliance != row['Appliance']:
-                if current_appliance is not None:
-                    print("-" * 80)
-                current_appliance = row['Appliance']
-                # Print header for first row or after separator
-                if idx == df.index[0] or current_appliance != df.iloc[df.index.get_loc(idx) - 1]['Appliance']:
-                    print(f"{'Appliance':<15} {'Synthetic':<10} {'Window':<10} {'Model':<15} {'Seed':<8} {'MAE':<12} {'MR':<12}")
-            
-            # Format the values
-            mae_str = f"{row['MAE']:.1f}" if isinstance(row['MAE'], (int, float)) else str(row['MAE'])
-            mr_str = f"{row['MR']:.3f}" if isinstance(row['MR'], (int, float)) else str(row['MR'])
-            
-            print(f"{row['Appliance']:<15} {row['Synthetic']:<10} {row['Window']:<10} {row['Model']:<15} {row['Seed']:<8} {mae_str:<12} {mr_str:<12}")
         
-        print("\n" + "="*80)
+        for app, synth, synth_num in row_keys:
+            # Print separator between appliances
+            if current_appliance != app and current_appliance is not None:
+                print("-" * 120)
+            current_appliance = app
+            
+            # Start Row String
+            row_str = f"{app:<15} {synth:<10}"
+            
+            # Fill Columns for each window
+            for w in windows:
+                # Find the row for this combo
+                match = df[(df['Appliance'] == app) & (df['Synthetic'] == synth) & (df['Window'] == w)]
+                
+                if not match.empty:
+                    mae = match.iloc[0]['MAE']
+                    mr = match.iloc[0]['MR']
+                    
+                    mae_str = f"{mae:.1f}" if isinstance(mae, (int, float)) else str(mae)
+                    mr_str = f"{mr:.3f}" if isinstance(mr, (int, float)) else str(mr)
+                    
+                    row_str += f" | {mae_str:^11} {mr_str:^11}"
+                else:
+                    row_str += f" | {'-':^11} {'-':^11}"
+            
+            print(row_str)
+
+        print("="*120 + "\n")
         print("Note: MR displayed as ACCURACY if explicit MR is missing.")
-        print("="*80 + "\n")
     else:
         print("No result (.pt) files found.")
 
