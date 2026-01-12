@@ -83,6 +83,7 @@ def launch_one_experiment(expes_config: OmegaConf):
 
         
         # Reconstruct 4D arrays: (N, 2, 10, window_size)
+        # Reconstruct 4D arrays: (N, 2, 10, window_size)
         def reconstruct_4d(agg, time_feat, power, state):
             N, _, L = agg.shape
             data_4d = np.zeros((N, 2, 10, L))
@@ -92,31 +93,57 @@ def launch_one_experiment(expes_config: OmegaConf):
             data_4d[:, 1, 1, :] = state[:, 0, :]
             return data_4d
         
-        data_train = reconstruct_4d(train_agg, train_time, train_power, train_state)
-        # data_valid = reconstruct_4d(valid_agg, valid_time, valid_power, valid_state) # IGNORE external file
-        data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
+        # 1. Prepare Target Training Data (from current folder, e.g. 25%)
+        data_train_target = reconstruct_4d(train_agg, train_time, train_power, train_state)
         
+        # 2. Prepare Real Data for Validation (from 0% folder)
+        # We need to construct the path to 0% data explicitly
+        real_data_dir = tensor_dir.parent / '0%'
         
-        # NOTE: st_date is set to None because we use pre-loaded time features from train_time.pt
-        # The modified NILMDataset (dataset.py) will extract time features from channels 2-9
-        # instead of regenerating from dates. This preserves your prepared time data.
-        st_date_train = None
-        
-        # CRITICAL FIX: Split Training Data into Train/Valid (80/20) matching run_one_expe.py
-        # run_one_expe.py ignores separate validation houses and splits the training set instead.
-        # This ensures Validation Data is In-Distribution (easy) vs Out-of-Distribution (hard).
-        logging.info("Splitting Training tensors 80/20 for Validation (matching run_one_expe.py behavior)...")
-        
-        # For splitting, we need a dummy st_date structure (just for indexing)
+        if expes_config.synthetic_pct and expes_config.synthetic_pct != '0%':
+             # Load 0% Real Data if we are in a synthetic experiment
+             logging.info(f"Loading 0% Real Data for Validation from: {real_data_dir}")
+             try:
+                 r_agg = torch.load(real_data_dir / 'train_agg.pt', weights_only=False).numpy()
+                 r_time = torch.load(real_data_dir / 'train_time.pt', weights_only=False).numpy()
+                 r_power = torch.load(real_data_dir / 'train_power.pt', weights_only=False).numpy()
+                 r_state = torch.load(real_data_dir / 'train_state.pt', weights_only=False).numpy()
+                 data_real = reconstruct_4d(r_agg, r_time, r_power, r_state)
+             except Exception as e:
+                 logging.error(f"Failed to load 0% Real Data: {e}. Falling back to target data split.")
+                 data_real = data_train_target
+        else:
+             # If we are already in 0%, data_real IS data_train_target
+             data_real = data_train_target
+
+        # 3. Create Validation Set from REAL Data (80/20 split)
         import pandas as pd
-        dummy_st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_train), freq='10s')})
+        dummy_st_date = pd.DataFrame({'start_date': pd.date_range('2013-01-01', periods=len(data_real), freq='10s')})
         
-        data_train, _, data_valid, _ = split_train_test_nilmdataset(
-             data_train,
+        # Split REAL data to get a reserved validation chunk (20%)
+        data_real_train_part, _, data_valid_real, _ = split_train_test_nilmdataset(
+             data_real,
              dummy_st_date,  # Only used for splitting indices
-             perc_house_test=0.2,
+             perc_house_test=0.2, # 20% for validation
              seed=expes_config.seed
         )
+        
+        # 4. Assign Final Datasets
+        # Validation is ALWAYS the real validation chunk
+        data_valid = data_valid_real
+        
+        if expes_config.synthetic_pct and expes_config.synthetic_pct != '0%':
+            # For synthetic experiments (>0%), use the FULL synthetic training set loaded from current dir
+            data_train = data_train_target
+        else:
+            # For 0% experiments, use the remaining 80% of Real data to avoid overlap
+            data_train = data_real_train_part
+        
+        logging.info(f"Final Train Shape: {data_train.shape} (Source: {expes_config.synthetic_pct})")
+        logging.info(f"Final Valid Shape: {data_valid.shape} (Source: 0% Real Split)")
+
+        # Load Test Data
+        data_test = reconstruct_4d(test_agg, test_time, test_power, test_state)
         
         # Set all st_date to None - time features come from your .pt files
         st_date_train = None
