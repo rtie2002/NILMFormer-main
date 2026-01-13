@@ -125,7 +125,8 @@ def launch_one_experiment(expes_config: OmegaConf):
              data_real,
              dummy_st_date,  # Only used for splitting indices
              perc_house_test=0.2, # 20% for validation
-             seed=expes_config.seed
+             seed=expes_config.seed,
+             shuffle=False
         )
         
         # 4. Assign Final Datasets

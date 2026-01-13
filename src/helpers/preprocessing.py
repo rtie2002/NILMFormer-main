@@ -211,11 +211,12 @@ def split_train_test_pdl_nilmdataset(
         return data_train, st_date_train, data_test, st_date_test
 
 
-def split_train_test_nilmdataset(data, st_date, perc_house_test=0.2, seed=0):
+def split_train_test_nilmdataset(data, st_date, perc_house_test=0.2, seed=0, shuffle=True):
     np.random.seed(seed)
 
     data_len = np.arange(len(data))
-    np.random.shuffle(data_len)
+    if shuffle:
+        np.random.shuffle(data_len)
 
     split_index = int(len(data_len) * (1 - perc_house_test))
     train_idx, test_idx = data_len[:split_index], data_len[split_index:]
