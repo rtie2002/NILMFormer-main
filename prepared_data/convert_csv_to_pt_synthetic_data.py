@@ -299,14 +299,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert CSV to PyTorch tensors for synthetic data experiments')
     parser.add_argument('--appliance', type=str, help='Appliance name (e.g., dishwasher). If not specified, processes all.')
     parser.add_argument('--window_size', type=int, help='Window size (e.g., 128, 256, 512). If not specified, processes all.')
-    parser.add_argument('--synthetic_pct', type=str, help='Synthetic percentage (0%, 25%, 50%, 100%). If not specified, processes all.')
-    parser.add_argument('--all', action='store_true', help='Process all combinations (5 appliances × 3 windows × 4 percentages = 60 experiments)')
+    parser.add_argument('--synthetic_pct', type=str, help='Synthetic percentage (0%, 25%, 50%, 100%, 200%). If not specified, processes all.')
+    parser.add_argument('--all', action='store_true', help='Process all combinations (5 appliances × 3 windows × 5 percentages = 75 experiments)')
     args = parser.parse_args()
     
     # Define all possible values
     all_appliances = ['dishwasher', 'fridge', 'kettle', 'microwave', 'washing_machine']
     all_windows = [128, 256, 512]
-    all_percentages = ['0%', '25%', '50%', '100%']
+    all_percentages = ['0%', '25%', '50%', '100%', '200%']
     
     # Determine what to process
     if args.all:

@@ -6,7 +6,7 @@ $APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
 
 $MODELS = @("NILMFormer")
 $WINDOW_SIZES = @("128", "256", "512")
-$SYNTHETIC_PERCENTAGES = @("0%", "25%", "50%", "100%")
+$SYNTHETIC_PERCENTAGES = @("0%", "25%", "50%", "100%", "200%")
 
 # Run experiments
 function Run-Batch {
