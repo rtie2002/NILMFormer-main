@@ -31,7 +31,34 @@ from src.helpers.expes import launch_models_training
 
 
 def launch_one_experiment(expes_config: OmegaConf):
+    # 1. Set seed for Python's built-in random
+    import random
+    import os
+    random.seed(expes_config.seed)
+    
+    # 2. Set seed for NumPy
     np.random.seed(seed=expes_config.seed)
+    
+    # 3. Set seed for PyTorch
+    import torch
+    torch.manual_seed(expes_config.seed)
+    
+    # 4. Set environment variables for reproducibility
+    os.environ["PYTHONHASHSEED"] = str(expes_config.seed)
+    # Required for deterministic algorithms in some CUDA versions
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(expes_config.seed)
+        torch.cuda.manual_seed_all(expes_config.seed) # if using multi-GPU
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
+        # 5. Enforce deterministic algorithms (warn_only=True to avoid crashing on unsupported ops)
+        try:
+            torch.use_deterministic_algorithms(True, warn_only=True)
+        except AttributeError:
+            pass # older torch versions might not have this
 
     logging.info("Process data ...")
     

@@ -1,5 +1,10 @@
 # Global parameters
-$SEEDS = @(0)
+$SEEDS = @(0) # Master Seed(s) - controls all randomness
+
+# Set environment variables for reproducibility BEFORE Python starts
+# This ensures dictionary iteration order and other hash-based operations are deterministic
+$env:PYTHONHASHSEED = "0"
+$env:CUBLAS_WORKSPACE_CONFIG = ":4096:8"
 
 $DATASETS = @("UKDALE")
 $APPLIANCES = @("WashingMachine", "Dishwasher", "Kettle", "Microwave", "Fridge")
