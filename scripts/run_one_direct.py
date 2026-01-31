@@ -58,7 +58,13 @@ def launch_one_experiment(expes_config: OmegaConf):
         torch.backends.cudnn.deterministic = False  # Set to False to allow faster algorithms
         torch.backends.cudnn.benchmark = True       # Set to True to optimize for your specific GPU (4090)
         
+        # ENABLE TENSORFLOAT-32 (TF32) - Huge speedup on RTX 4090
+        # This keeps FP32 dynamic range but uses BF16 precision for matrix muls
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        
         # We REMOVE torch.use_deterministic_algorithms(True) to prevent slowdown
+
 
 
     logging.info("Process data ...")

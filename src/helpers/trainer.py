@@ -464,22 +464,33 @@ class SeqToSeqTrainer:
                 target = torch.Tensor(states.float()).to(self.device)
 
             # ===================forward===================== #
+            # ===================forward===================== #
             self.optimizer.zero_grad()
 
-            if self.loss_in_model:
-                pred, loss = self.model(ts_agg, target)
-            else:
-                if self.consumption_pred:
-                    pred = self.model(ts_agg)
-                else:
-                    pred = nn.Sigmoid()(self.model(ts_agg))
+            # Enable Automatic Mixed Precision (AMP)
+            use_amp = True
+            # Check if scaler exists (it should, as we added it to init), but be safe
+            if not hasattr(self, 'scaler'):
+                self.scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
-                loss = self.train_criterion(pred, target)
+            with torch.cuda.amp.autocast(enabled=use_amp):
+                if self.loss_in_model:
+                    pred, loss = self.model(ts_agg, target)
+                else:
+                    if self.consumption_pred:
+                        pred = self.model(ts_agg)
+                    else:
+                        pred = nn.Sigmoid()(self.model(ts_agg))
+
+                    loss = self.train_criterion(pred, target)
 
             # ===================backward==================== #
             loss_train += loss.item()
-            loss.backward()
-            self.optimizer.step()
+            
+            # Use scaler for backward pass
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
 
         loss_train = loss_train / len(self.train_loader)
 
