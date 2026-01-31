@@ -43,22 +43,23 @@ def launch_one_experiment(expes_config: OmegaConf):
     import torch
     torch.manual_seed(expes_config.seed)
     
-    # 4. Set environment variables for reproducibility
+    # 4. Set environment variables for reproducibility (Basic)
     os.environ["PYTHONHASHSEED"] = str(expes_config.seed)
-    # Required for deterministic algorithms in some CUDA versions
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
+    
+    # OPTIMIZATION FOR RTX 4090 SPEED
+    # We maintain the seeds (above) so initialization and data shuffling are identical.
+    # However, we allow cuDNN to find the fastest algorithms (benchmark=True).
+    # This might introduce tiny floating-point differences, but significantly restores speed.
     if torch.cuda.is_available():
         torch.cuda.manual_seed(expes_config.seed)
-        torch.cuda.manual_seed_all(expes_config.seed) # if using multi-GPU
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+        torch.cuda.manual_seed_all(expes_config.seed)
         
-        # 5. Enforce deterministic algorithms (warn_only=True to avoid crashing on unsupported ops)
-        try:
-            torch.use_deterministic_algorithms(True, warn_only=True)
-        except AttributeError:
-            pass # older torch versions might not have this
+        # High Performance Settings
+        torch.backends.cudnn.deterministic = False  # Set to False to allow faster algorithms
+        torch.backends.cudnn.benchmark = True       # Set to True to optimize for your specific GPU (4090)
+        
+        # We REMOVE torch.use_deterministic_algorithms(True) to prevent slowdown
+
 
     logging.info("Process data ...")
     
