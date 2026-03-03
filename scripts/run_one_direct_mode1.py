@@ -254,10 +254,23 @@ def main():
         else:
             raise ValueError(f"Model {args.name_model} unknown.")
 
-    if args.appliance in datasets_config:
-        expes_config.update(datasets_config[args.appliance])
+    # ── Normalize appliance name to match config keys (e.g. dishwasher -> Dishwasher) ──
+    app_to_key = {
+        "dishwasher": "Dishwasher",
+        "fridge": "Fridge",
+        "kettle": "Kettle",
+        "microwave": "Microwave",
+        "washingmachine": "WashingMachine",
+        "washing_machine": "WashingMachine"
+    }
+    app_key = app_to_key.get(args.appliance.lower(), args.appliance.capitalize())
+
+    if app_key in datasets_config:
+        expes_config.update(datasets_config[app_key])
+        # Force the config appliance name back to the model's expected string
+        args.appliance = app_key
     else:
-        raise ValueError(f"Appliance {args.appliance} not in dataset config.")
+        raise ValueError(f"Appliance {args.appliance} (mapped to {app_key}) not in dataset config.")
 
     # ── Update config ─────────────────────────────────────────────────────────
     expes_config["dataset"]       = args.dataset
