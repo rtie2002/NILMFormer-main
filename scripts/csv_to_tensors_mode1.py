@@ -32,6 +32,16 @@ import numpy as np
 import pandas as pd
 import torch
 
+# ── Column indices inside the CSV ───────────────────────────────────────────
+COL_AGG   = "aggregate"          # column 0
+# column 1 = appliance power (name varies)
+TIME_COLS = [                    # columns 2-9
+    "minute_sin", "minute_cos",
+    "hour_sin",   "hour_cos",
+    "dow_sin",    "dow_cos",
+    "month_sin",  "month_cos",
+]
+
 # Appliance parameters from NILMFormer (preprocessing.py Line 402-438)
 # Time parameters are in units of 1min (matching our sampling rate)
 APPLIANCE_PARAMS = {
