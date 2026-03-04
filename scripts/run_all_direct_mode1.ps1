@@ -31,7 +31,6 @@ foreach ($dataset in $DATASETS) {
         foreach ($appliance in $APPLIANCES) {
             $scenarios = Get-Scenarios -App $appliance -Win $win
             if ($scenarios.Count -eq 0) {
-                # Skip this app/win combo if no data
                 Write-Host "  [SKIP] No scenarios found for $appliance / win=$win" -ForegroundColor Yellow
                 continue
             }
@@ -45,6 +44,13 @@ foreach ($dataset in $DATASETS) {
                         Write-Host "Scenario=$scenario  Model=$model  Seed=$seed" -ForegroundColor Yellow
                         Write-Host "========================================`n" -ForegroundColor Cyan
 
+                        $resultPath = "result\mode1\${dataset}_${appliance}_1min_${scenario}\${win}\${model}_${seed}.pt"
+                        
+                        # Fix: Cleanup old results to prevent 11.44 contamination
+                        if (Test-Path $resultPath) {
+                            Remove-Item -Force $resultPath
+                        }
+
                         python scripts\run_one_direct_mode1.py `
                             --dataset      "$dataset" `
                             --sampling_rate "1min" `
@@ -55,14 +61,16 @@ foreach ($dataset in $DATASETS) {
                             --scenario     "$scenario"
 
                         # Show result if saved
-                        $resultPath = "result\mode1\${dataset}_${appliance}_1min_${scenario}\${win}\${model}_${seed}.pt"
                         if (Test-Path $resultPath) {
-                            $resultPathFixed = $resultPath.Replace("\", "/")
+                            $resultPathPy = $resultPath.Replace("\", "/")
                             Write-Host "`n--- Results: $appliance | $scenario | win=$win ---" -ForegroundColor Green
                             python -c @"
 import torch, sys
 try:
-    log = torch.load('$resultPathFixed', weights_only=False)
+    log = torch.load('$resultPathPy', weights_only=False)
+    print('\nTest Metrics (Timestamp):')
+    for k,v in log.get('test_metrics_timestamp', {}).items():
+        print(f'  {k}: {v:.4f}')
     print('\nTest Metrics (Window):')
     for k,v in log.get('test_metrics_win', {}).items():
         print(f'  {k}: {v:.4f}')
@@ -71,26 +79,20 @@ try:
     if 'value_best_loss' in log:
         print(f"  Best Loss  : {log['value_best_loss']:.6f}")
 except Exception as e:
-    print(f'Error reading result: {e}', file=sys.stderr)
+    print(f'Error reading result: {e}')
 "@
                         }
                         else {
                             Write-Host "  [WARN] Result not found: $resultPath" -ForegroundColor Red
                         }
 
-                        # ── Updated: Print the summary table after EACH experiment ──
+                        # Update summary table after EACH experiment
                         python scripts\summarize_results_mode1.py
-
                     }
                 }
             }
         }
     }
-}
-
-Write-Host "`n========================================" -ForegroundColor Magenta
-Write-Host "       ALL MODE1 EXPERIMENTS DONE      " -ForegroundColor Magenta
-Write-Host "========================================`n" -ForegroundColor Magenta
 }
 
 Write-Host "`n========================================" -ForegroundColor Magenta
