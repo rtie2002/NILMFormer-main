@@ -166,7 +166,7 @@ def launch_one_experiment(expes_config: OmegaConf):
     # ── Thresholds ────────────────────────────────────────────────────────────
     thresholds = {
         "kettle":          500,
-        "washing_machine": 300,
+        "washing_machine": 50,
         "dishwasher":      300,
         "microwave":       200,
         "fridge":           50,

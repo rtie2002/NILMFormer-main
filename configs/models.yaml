@@ -5,7 +5,7 @@ BiGRU:
     return_values: "power"
     verbose_loss: false
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -13,7 +13,7 @@ BiLSTM:
   model_kwargs:
     downstreamtask : "seq2seq"
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -27,7 +27,7 @@ CNN1D:
     return_values: "power"
     verbose_loss: false
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -43,7 +43,7 @@ UNET_NILM:
     return_values: "power"
     verbose_loss: false
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: 0
     training_in_model: false
 
@@ -51,7 +51,7 @@ FCN:
   model_kwargs:
     downstreamtask: "seq2seq"
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -59,7 +59,7 @@ DResNet:
   model_kwargs:
     kernel_size: 3
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -67,7 +67,7 @@ DAResNet:
   model_kwargs:
     kernel_size: 3
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -82,7 +82,7 @@ BERT4NILM:
     threshold: null
     return_values: !!str "power"
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -116,7 +116,7 @@ TSILNet:
     head_ffn_dim: 512
     head_dropout: 0.2
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -131,7 +131,7 @@ Energformer:
     att_dropout: 0.2
     ffn_dropout: 0.2
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
 
@@ -175,6 +175,6 @@ NILMFormer:
     n_head: 8
     norm_eps: !!float 1e-5
   model_training_param:
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     wd: !!float 0
     training_in_model: false
