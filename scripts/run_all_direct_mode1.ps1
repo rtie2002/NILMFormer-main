@@ -65,13 +65,11 @@ foreach ($dataset in $DATASETS) {
 
                         # Show result if saved
                         if (Test-Path $resultPath) {
-                            $env:RESULT_PATH_PY = $resultPath.Replace("\", "/")
-                            Write-Host "`n--- Results: $appliance | $scenario | win=$win ---" -ForegroundColor Green
-                            python -c @'
-import torch, os, sys
+                            $tmpScript = [System.IO.Path]::GetTempFileName() + ".py"
+                            @"
+import torch, sys
 try:
-    path = os.environ.get("RESULT_PATH_PY")
-    log = torch.load(path, weights_only=False)
+    log = torch.load(r'$resultPath', weights_only=False)
     print('\nTest Metrics (Window):')
     for k,v in log.get('test_metrics_win', {}).items():
         print(f'  {k}: {v:.4f}')
@@ -81,7 +79,11 @@ try:
         print(f"  Best Loss  : {log['value_best_loss']:.6f}")
 except Exception as e:
     print(f"Error reading result: {e}")
-'@
+"@ | Out-File -FilePath $tmpScript -Encoding utf8
+                            
+                            Write-Host "`n--- Results: $appliance | $scenario | win=$win ---" -ForegroundColor Green
+                            python $tmpScript
+                            Remove-Item $tmpScript
                         }
                         else {
                             Write-Host "  [WARN] Result not found: $resultPath" -ForegroundColor Red
