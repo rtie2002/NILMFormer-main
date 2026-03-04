@@ -63,9 +63,6 @@ foreach ($dataset in $DATASETS) {
 import torch, sys
 try:
     log = torch.load('$resultPathFixed', weights_only=False)
-    print('\nTest Metrics (Timestamp):')
-    for k,v in log.get('test_metrics_timestamp', {}).items():
-        print(f'  {k}: {v:.4f}')
     print('\nTest Metrics (Window):')
     for k,v in log.get('test_metrics_win', {}).items():
         print(f'  {k}: {v:.4f}')
@@ -89,6 +86,11 @@ except Exception as e:
             }
         }
     }
+}
+
+Write-Host "`n========================================" -ForegroundColor Magenta
+Write-Host "       ALL MODE1 EXPERIMENTS DONE      " -ForegroundColor Magenta
+Write-Host "========================================`n" -ForegroundColor Magenta
 }
 
 Write-Host "`n========================================" -ForegroundColor Magenta
