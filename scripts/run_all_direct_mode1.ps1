@@ -46,9 +46,12 @@ foreach ($dataset in $DATASETS) {
 
                         $resultPath = "result\mode1\${dataset}_${appliance}_1min_${scenario}\${win}\${model}_${seed}.pt"
                         
-                        # Fix: Cleanup old results to prevent 11.44 contamination
+                        # SKIP logic: If result already exists, don't re-run
                         if (Test-Path $resultPath) {
-                            Remove-Item -Force $resultPath
+                            Write-Host "  [SKIP] Result already exists: $resultPath" -ForegroundColor Green
+                            # Still update summary table to ensure it's fresh
+                            python scripts\summarize_results_mode1.py
+                            continue
                         }
 
                         python scripts\run_one_direct_mode1.py `
