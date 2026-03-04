@@ -62,25 +62,23 @@ foreach ($dataset in $DATASETS) {
 
                         # Show result if saved
                         if (Test-Path $resultPath) {
-                            $resultPathPy = $resultPath.Replace("\", "/")
+                            $env:RESULT_PATH_PY = $resultPath.Replace("\", "/")
                             Write-Host "`n--- Results: $appliance | $scenario | win=$win ---" -ForegroundColor Green
-                            python -c @"
-import torch, sys
+                            python -c @'
+import torch, os, sys
 try:
-    log = torch.load('$resultPathPy', weights_only=False)
-    print('\nTest Metrics (Timestamp):')
-    for k,v in log.get('test_metrics_timestamp', {}).items():
-        print(f'  {k}: {v:.4f}')
+    path = os.environ.get("RESULT_PATH_PY")
+    log = torch.load(path, weights_only=False)
     print('\nTest Metrics (Window):')
     for k,v in log.get('test_metrics_win', {}).items():
         print(f'  {k}: {v:.4f}')
-    if 'epoch_best_loss' in log:
+    if "epoch_best_loss" in log:
         print(f"\n  Best Epoch : {log['epoch_best_loss']}")
-    if 'value_best_loss' in log:
+    if "value_best_loss" in log:
         print(f"  Best Loss  : {log['value_best_loss']:.6f}")
 except Exception as e:
-    print(f'Error reading result: {e}')
-"@
+    print(f"Error reading result: {e}")
+'@
                         }
                         else {
                             Write-Host "  [WARN] Result not found: $resultPath" -ForegroundColor Red

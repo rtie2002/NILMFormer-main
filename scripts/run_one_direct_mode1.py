@@ -140,9 +140,9 @@ def launch_one_experiment(expes_config: OmegaConf):
             shuffle=False,
         )
 
-    logging.info(f"Train : {data_train.shape}")
-    logging.info(f"Valid : {data_valid.shape}")
-    logging.info(f"Test  : {data_test.shape}")
+    logging.info(f"Train : {data_train.shape} (Mean: {np.mean(data_train[:,0,0,:]):.6f}, Max: {np.max(data_train[:,0,0,:]):.6f})")
+    logging.info(f"Valid : {data_valid.shape} (Mean: {np.mean(data_valid[:,0,0,:]):.6f})")
+    logging.info(f"Test  : {data_test.shape} (Mean: {np.mean(data_test[:,0,0,:]):.6f})")
 
     # ── st_dates (None — time features come from .pt files) ─────────────────
     st_date_train = None
