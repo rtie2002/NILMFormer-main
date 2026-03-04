@@ -377,6 +377,7 @@ class SeqToSeqTrainer:
 
             self.log[mask + "_timestamp"] = metrics_timestamp
             self.log[mask + "_win"] = metrics_win
+            logging.info(f"  Max Predicted Power ({mask}): {np.max(y_hat):.4f}")
         else:
             metrics = self.f_metrics(
                 y=None, y_hat=None, y_state=y_state, y_hat_state=y_state
