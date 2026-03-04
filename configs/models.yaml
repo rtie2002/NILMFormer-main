@@ -169,8 +169,8 @@ NILMFormer:
 
     use_efficient_attention: false
     n_encoder_layers: 3
-    d_model: 96
-    dp_rate: 0.2
+    d_model: 128
+    dp_rate: 0.1
     pffn_ratio: 4
     n_head: 8
     norm_eps: !!float 1e-5
