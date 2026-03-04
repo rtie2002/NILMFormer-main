@@ -172,6 +172,10 @@ def eval_win_energy_aggregation(
     threshold_small_values=0,
     use_temperature=False,
 ):
+    if input_st_date_test is None:
+        # Cannot calculate daily/weekly/monthly metrics without timestamps
+        return
+
     data_test = input_data_test.copy()
     st_date_test = input_st_date_test.copy()
 

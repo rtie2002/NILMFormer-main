@@ -57,11 +57,12 @@ foreach ($dataset in $DATASETS) {
                         # Show result if saved
                         $resultPath = "result\mode1\${dataset}_${appliance}_1min_${scenario}\${win}\${model}_${seed}.pt"
                         if (Test-Path $resultPath) {
+                            $resultPathFixed = $resultPath.Replace("\", "/")
                             Write-Host "`n--- Results: $appliance | $scenario | win=$win ---" -ForegroundColor Green
                             python -c @"
 import torch, sys
 try:
-    log = torch.load('$resultPath', weights_only=False)
+    log = torch.load('$resultPathFixed', weights_only=False)
     print('\nTest Metrics (Timestamp):')
     for k,v in log.get('test_metrics_timestamp', {}).items():
         print(f'  {k}: {v:.4f}')

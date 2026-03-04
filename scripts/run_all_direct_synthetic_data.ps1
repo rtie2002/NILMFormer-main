@@ -45,6 +45,7 @@ function Run-Batch {
                             # Display evaluation results
                             $resultPath = "result/${dataset}_${appliance}_1min_${synth_pct}/${win}/${model}_${seed}.pt"
                             if (Test-Path $resultPath) {
+                                $resultPathFixed = $resultPath.Replace("\", "/")
                                 Write-Host "`n========================================" -ForegroundColor Green
                                 Write-Host "Evaluation Results for $dataset - $appliance - $synth_pct - $model (seed $seed)" -ForegroundColor Green
                                 Write-Host "========================================" -ForegroundColor Green
@@ -55,7 +56,7 @@ import torch
 import sys
 
 try:
-    log = torch.load('$resultPath', weights_only=False)
+    log = torch.load('$resultPathFixed', weights_only=False)
     
     print('\n--- Test Metrics (Timestamp) ---')
     if 'test_metrics_timestamp' in log:
