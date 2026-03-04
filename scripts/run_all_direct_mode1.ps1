@@ -10,10 +10,8 @@ $DATASETS = @("UKDALE")
 $MODELS = @("NILMFormer")
 $WINDOW_SIZES = @("256", "128", "512")
 
-# Auto-detect appliances from folders ending in _realPower
-$APPLIANCES = (Get-ChildItem -Directory "prepared_data_Mode1").Name | `
-    Where-Object { $_ -like "*_realPower" } | `
-    ForEach-Object { $_.Replace("_realPower", "") }
+# Manual appliance list (Order here = Training Order)
+$APPLIANCES = @("WashingMachine", "Microwave", "Dishwasher", "Fridge", "Kettle")
 
 # Set reproducibility env vars
 $env:PYTHONHASHSEED = "0"
@@ -29,10 +27,11 @@ function Get-Scenarios {
 
 # ── Main batch loop ─────────────────────────────────────────────────────────
 foreach ($dataset in $DATASETS) {
-    foreach ($appliance in $APPLIANCES) {
-        foreach ($win in $WINDOW_SIZES) {
+    foreach ($win in $WINDOW_SIZES) {
+        foreach ($appliance in $APPLIANCES) {
             $scenarios = Get-Scenarios -App $appliance -Win $win
             if ($scenarios.Count -eq 0) {
+                # Skip this app/win combo if no data
                 Write-Host "  [SKIP] No scenarios found for $appliance / win=$win" -ForegroundColor Yellow
                 continue
             }
