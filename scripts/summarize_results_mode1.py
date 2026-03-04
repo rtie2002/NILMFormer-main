@@ -111,7 +111,11 @@ def main():
                     elif m == "ERR":
                         line += f" {'FAIL':^25} |"
                     else:
-                        m_str = f"{m['MAE']:>5.2f}{m['SAE']:>6.2f}{m['RECALL']:>7.2f}{m['F1']:>7.2f}"
+                        # Safe formatting for potential None values
+                        def f(v, fmt):
+                            return f"{v:{fmt}}" if v is not None else "  -  "
+                        
+                        m_str = f"{f(m['MAE'], '>5.2f')}{f(m['SAE'], '>6.2f')}{f(m['RECALL'], '>7.2f')}{f(m['F1'], '>7.2f')}"
                         line += f" {m_str} |"
                         found_data = True
                         found_any_in_win = True
