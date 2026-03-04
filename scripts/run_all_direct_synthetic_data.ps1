@@ -23,10 +23,10 @@ function Run-Batch {
         [Parameter(Mandatory = $true)] [string[]]$SyntheticPercentages
     )
 
-    foreach ($dataset in $Datasets) {
-        foreach ($appliance in $Appliances) {
-            foreach ($synth_pct in $SyntheticPercentages) {
-                foreach ($win in $WindowSizes) {
+    foreach ($win in $WindowSizes) {
+        foreach ($dataset in $Datasets) {
+            foreach ($appliance in $Appliances) {
+                foreach ($synth_pct in $SyntheticPercentages) {
                     foreach ($model in $Models) {
                         foreach ($seed in $SEEDS) {
                             Write-Host "`n========================================" -ForegroundColor Cyan

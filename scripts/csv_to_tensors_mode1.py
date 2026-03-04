@@ -105,22 +105,43 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
     print(f"{'='*60}")
 
     # ── Locate files ─────────────────────────────────────────────────────────
-    test_csv = app_folder / f"{app_name}_test__realPower.csv"
-    if not test_csv.exists():
-        print(f"  [SKIP] Test CSV not found: {test_csv}")
+    # Use glob to handle slight naming variations (e.g. washing_machine vs washingmachine)
+    test_files = list(app_folder.glob("*_test__realPower.csv"))
+    if not test_files:
+        print(f"  [SKIP] Test CSV not found in {app_folder}")
         return
+    test_csv = test_files[0]
 
-    train_csvs = sorted(f for f in app_folder.glob(f"{app_name}_training_*_realPower.csv"))
+    # Explicitly check column names from the test CSV
+    df_preview = pd.read_csv(test_csv, nrows=0)
+    actual_cols = list(df_preview.columns)
+    # The appliance column is usually the 2nd one (index 1)
+    app_col = actual_cols[1]
+    print(f"  Detected appliance column: '{app_col}'")
+
+    train_csvs = sorted(f for f in app_folder.glob("*_training_*_realPower.csv"))
     if not train_csvs:
         print(f"  [SKIP] No training CSVs found in {app_folder}")
         return
 
-    # ── Compute global max from ALL training files + test file ───────────────
+    # ── Compute global max from ALL files (Train + Test + Valid) ──────────────
     print("  Computing global max values from all CSVs...")
     all_agg_max   = 0.0
     all_app_max   = 0.0
 
-    for csv in [test_csv] + train_csvs:
+    # Determine validation file location using glob for robustness
+    valid_files = list(app_folder.glob("*_validation__realPower.csv"))
+    if not valid_files:
+        # Fallback to main prepared_data folder
+        valid_files = list(Path("prepared_data").glob(f"{app_name}*_validation__realPower.csv"))
+    
+    valid_csv = valid_files[0] if valid_files else None
+
+    all_files = [test_csv] + train_csvs
+    if valid_csv:
+        all_files.append(valid_csv)
+
+    for csv in all_files:
         df = pd.read_csv(csv, usecols=[COL_AGG, app_col], dtype=np.float32)
         all_agg_max = max(all_agg_max, float(df[COL_AGG].max()))
         all_app_max = max(all_app_max, float(df[app_col].max()))
@@ -133,12 +154,6 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
     # ── Pre-build test & validation tensors once per window size ────────────────
     test_tensors_per_win = {}
     
-    # Priority: look in the local appliance folder first
-    valid_csv = app_folder / f"{app_name}_validation__realPower.csv"
-    if not valid_csv.exists():
-        # Fallback to main prepared_data folder
-        valid_csv = Path("prepared_data") / f"{app_name}_validation__realPower.csv"
-    
     for win in window_sizes:
         print(f"\n  [Test]  window={win}  {test_csv.name}")
         t_agg, t_time, t_power, t_state = csv_to_windows(
@@ -146,13 +161,13 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
         )
         
         v_agg, v_time, v_power, v_state = (None, None, None, None)
-        if valid_csv.exists():
+        if valid_csv:
             print(f"  [Valid] window={win}  {valid_csv.name}")
             v_agg, v_time, v_power, v_state = csv_to_windows(
                 valid_csv, app_col, win, all_agg_max, all_app_max, threshold
             )
         else:
-            print(f"  [SKIP] Validation CSV not found: {valid_csv}")
+            print(f"  [SKIP] Validation CSV not found for {app_name}")
 
         test_tensors_per_win[win] = {
             "test": (t_agg, t_time, t_power, t_state),

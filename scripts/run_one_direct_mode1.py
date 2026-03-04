@@ -64,10 +64,12 @@ def launch_one_experiment(expes_config: OmegaConf):
     logging.info("Process data ...")
 
     # ── Tensor directory ─────────────────────────────────────────────────────
+    # Use the appliance name from config
+    app_folder_name = expes_config.appliance.lower().replace("_", "")
     tensor_dir = Path(
         f"prepared_data_Mode1/tensors"
         f"/{expes_config.window_size}"
-        f"/{expes_config.app.lower()}"
+        f"/{app_folder_name}"
         f"/{expes_config.scenario}"
     )
 
