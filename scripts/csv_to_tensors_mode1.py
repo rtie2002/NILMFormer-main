@@ -32,29 +32,93 @@ import numpy as np
 import pandas as pd
 import torch
 
-# ── Thresholds (Watts) matching run_one_direct.py ──────────────────────────
-THRESHOLDS = {
-    "kettle":          500,
-    "washing_machine": 300,
-    "washingmachine":  300,
-    "dishwasher":      300,
-    "microwave":       200,
-    "fridge":           50,
+# Appliance parameters from NILMFormer (preprocessing.py Line 402-438)
+# Time parameters are in units of 1min (matching our sampling rate)
+APPLIANCE_PARAMS = {
+    'dishwasher': {
+        'min_threshold': 10,
+        'max_threshold': 2500,
+        'min_on_duration': 30,
+        'min_off_duration': 30,
+        'min_activation_time': 2
+    },
+    'kettle': {
+        'min_threshold': 2000,
+        'max_threshold': 3100,
+        'min_on_duration': 1,
+        'min_off_duration': 0,
+        'min_activation_time': 1
+    },
+    'fridge': {
+        'min_threshold': 50,
+        'max_threshold': 300,
+        'min_on_duration': 1,
+        'min_off_duration': 1,
+        'min_activation_time': 1
+    },
+    'washing_machine': {
+        'min_threshold': 20,
+        'max_threshold': 2500,
+        'min_on_duration': 30,
+        'min_off_duration': 3,
+        'min_activation_time': 2
+    },
+    'microwave': {
+        'min_threshold': 200,
+        'max_threshold': 3000,
+        'min_on_duration': 1,
+        'min_off_duration': 1,
+        'min_activation_time': 1
+    }
 }
+# Alias for naming variants
+APPLIANCE_PARAMS['washingmachine'] = APPLIANCE_PARAMS['washing_machine']
 
-# ── Column indices inside the CSV ───────────────────────────────────────────
-COL_AGG   = "aggregate"          # column 0
-# column 1 = appliance power (name varies)
-TIME_COLS = [                    # columns 2-9
-    "minute_sin", "minute_cos",
-    "hour_sin",   "hour_cos",
-    "dow_sin",    "dow_cos",
-    "month_sin",  "month_cos",
-]
+def compute_status(initial_status, min_on, min_off, min_activation_time):
+    """
+    NILMFormer's original state detection method.
+    Filters states based on minimum ON/OFF durations and activation time.
+    """
+    tmp_status = np.zeros_like(initial_status)
+    status_diff = np.diff(initial_status)
+    events_idx = status_diff.nonzero()
 
+    events_idx = np.array(events_idx).squeeze()
+    if events_idx.ndim == 0 and events_idx.size == 1:
+        events_idx = np.array([events_idx])
+    events_idx += 1
+
+    if initial_status[0]:
+        events_idx = np.insert(events_idx, 0, 0)
+    if initial_status[-1]:
+        events_idx = np.insert(events_idx, events_idx.size, initial_status.size)
+
+    events_idx = events_idx.reshape((-1, 2))
+    on_events = events_idx[:, 0].copy()
+    off_events = events_idx[:, 1].copy()
+
+    if len(on_events) > 0:
+        off_duration = on_events[1:] - off_events[:-1]
+        off_duration = np.insert(off_duration, 0, 1000)
+        on_events = on_events[off_duration > min_off]
+        off_events = off_events[np.roll(off_duration, -1) > min_off]
+
+        on_duration = off_events - on_events
+        on_events = on_events[on_duration >= min_on]
+        off_events = off_events[on_duration >= min_on]
+
+    # Filter activations based on minimum continuous points
+    activation_durations = off_events - on_events
+    valid_activations = activation_durations >= min_activation_time
+    on_events = on_events[valid_activations]
+    off_events = off_events[valid_activations]
+
+    for on, off in zip(on_events, off_events):
+        tmp_status[on:off] = 1
+    return tmp_status
 
 def csv_to_windows(csv_path: Path, app_col: str, window_size: int,
-                   agg_max: float, app_max: float, threshold: float):
+                   agg_max: float, app_max: float, params: dict):
     """
     Read a CSV, slide non-overlapping windows of `window_size`,
     return normalized tensors.
@@ -65,8 +129,18 @@ def csv_to_windows(csv_path: Path, app_col: str, window_size: int,
     power = df[app_col].values.astype(np.float32)
     time  = df[TIME_COLS].values.astype(np.float32)   # shape (T, 8)
 
-    # Binary state from threshold
-    state = (power >= threshold).astype(np.float32)
+    # Binary state using compute_status (NILMFormer style)
+    initial_status = (
+        (power >= params['min_threshold']) &
+        (power <= params['max_threshold'])
+    ).astype(np.int32)
+    
+    state = compute_status(
+        initial_status,
+        params['min_on_duration'],
+        params['min_off_duration'],
+        params['min_activation_time']
+    ).astype(np.float32)
 
     # Normalize [0, 1]
     agg_norm   = np.clip(agg   / agg_max, 0, 1)
@@ -97,11 +171,11 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
     """Process all CSVs for one appliance folder."""
     # Identify appliance name from folder (e.g. dishwasher_realPower → dishwasher)
     app_name = app_folder.name.replace("_realPower", "").lower()
-    app_col  = app_name  # column name in CSV matches appliance name
-
-    threshold = THRESHOLDS.get(app_name, 10)
+    
+    # Get params
+    params = APPLIANCE_PARAMS.get(app_name, APPLIANCE_PARAMS['dishwasher'])
     print(f"\n{'='*60}")
-    print(f"Appliance : {app_name}  (threshold={threshold}W)")
+    print(f"Appliance : {app_name}  (threshold={params['min_threshold']}W)")
     print(f"{'='*60}")
 
     # ── Locate files ─────────────────────────────────────────────────────────
@@ -124,30 +198,36 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
         print(f"  [SKIP] No training CSVs found in {app_folder}")
         return
 
-    # ── Compute global max from ALL files (Train + Test + Valid) ──────────────
-    print("  Computing global max values from all CSVs...")
+    # ── Compute global max FIXED to Real Data (Train + Test + Valid) ──────────
+    print("  Computing global max values from REAL files only...")
     all_agg_max   = 0.0
     all_app_max   = 0.0
 
-    # Determine validation file location using glob for robustness
+    # Determine validation file location using glob
     valid_files = list(app_folder.glob("*_validation__realPower.csv"))
     if not valid_files:
-        # Fallback to main prepared_data folder
         valid_files = list(Path("prepared_data").glob(f"{app_name}*_validation__realPower.csv"))
-    
     valid_csv = valid_files[0] if valid_files else None
 
-    all_files = [test_csv] + train_csvs
+    # Identify the base REAL training file (200k+0k) to use for STABLE statistics
+    # Mode1 follows: app_training_200k+0k_ordered_realPower.csv
+    real_train_files = [f for f in train_csvs if "200k+0k" in f.name]
+    if not real_train_files:
+        real_train_files = [train_csvs[0]] # fallback
+    
+    # Files used for STATS (Normalization locking)
+    # We use Test + real_train + valid to find the MAX power
+    stats_files = [test_csv] + real_train_files
     if valid_csv:
-        all_files.append(valid_csv)
+        stats_files.append(valid_csv)
 
-    for csv in all_files:
+    for csv in stats_files:
         df = pd.read_csv(csv, usecols=[COL_AGG, app_col], dtype=np.float32)
         all_agg_max = max(all_agg_max, float(df[COL_AGG].max()))
         all_app_max = max(all_app_max, float(df[app_col].max()))
 
-    print(f"    agg_max = {all_agg_max:.2f} W")
-    print(f"    app_max = {all_app_max:.2f} W")
+    print(f"    FIXED agg_max = {all_agg_max:.2f} W")
+    print(f"    FIXED app_max = {all_app_max:.2f} W")
 
     stats = {"agg_max": all_agg_max, "app_max": all_app_max}
 
@@ -157,14 +237,14 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
     for win in window_sizes:
         print(f"\n  [Test]  window={win}  {test_csv.name}")
         t_agg, t_time, t_power, t_state = csv_to_windows(
-            test_csv, app_col, win, all_agg_max, all_app_max, threshold
+            test_csv, app_col, win, all_agg_max, all_app_max, params
         )
         
         v_agg, v_time, v_power, v_state = (None, None, None, None)
         if valid_csv:
             print(f"  [Valid] window={win}  {valid_csv.name}")
             v_agg, v_time, v_power, v_state = csv_to_windows(
-                valid_csv, app_col, win, all_agg_max, all_app_max, threshold
+                valid_csv, app_col, win, all_agg_max, all_app_max, params
             )
         else:
             print(f"  [SKIP] Validation CSV not found for {app_name}")
@@ -203,7 +283,7 @@ def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path)
 
             # Training tensors
             tr_agg, tr_time, tr_power, tr_state = csv_to_windows(
-                train_csv, app_col, win, all_agg_max, all_app_max, threshold
+                train_csv, app_col, win, all_agg_max, all_app_max, params
             )
             print(f"    window={win}  → train={tr_agg.shape[0]} windows")
 
