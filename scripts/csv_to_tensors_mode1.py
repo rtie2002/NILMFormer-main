@@ -179,8 +179,8 @@ def csv_to_windows(csv_path: Path, app_col: str, window_size: int,
 
 def process_appliance(app_folder: Path, window_sizes: list[int], out_base: Path):
     """Process all CSVs for one appliance folder."""
-    # Identify appliance name from folder (e.g. dishwasher_realPower → dishwasher)
-    app_name = app_folder.name.replace("_realPower", "").lower()
+    # Identify appliance name from folder and NORMALIZE (remove underscores)
+    app_name = app_folder.name.replace("_realPower", "").lower().replace("_", "")
     
     # Get params
     params = APPLIANCE_PARAMS.get(app_name, APPLIANCE_PARAMS['dishwasher'])

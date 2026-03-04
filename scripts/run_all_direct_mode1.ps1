@@ -8,7 +8,7 @@
 $SEEDS = @(0)
 $DATASETS = @("UKDALE")
 $MODELS = @("NILMFormer")
-$WINDOW_SIZES = @("128", "256", "512")
+$WINDOW_SIZES = @("256", "128", "512")
 
 # Auto-detect appliances from folders ending in _realPower
 $APPLIANCES = (Get-ChildItem -Directory "prepared_data_Mode1").Name | `
