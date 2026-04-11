@@ -56,23 +56,51 @@ def interactive_selection(root_dir, pattern, prompt_text, is_dir=False):
             print(f"Please enter a number between 1 and {len(items)}.")
 
 def get_user_paths():
-    """Prompt user for all three paths interactively."""
+    """Prompt user for model and auto-suggest matching data/CSV paths."""
     print("========================================")
-    print("  NILMFormer Interactive Path Selector  ")
+    print("  NILMFormer Smart Path Selector        ")
     print("========================================")
     
     # 1. Select Model
     results_dir = ROOT / "result"
     if not results_dir.exists(): results_dir = ROOT / "results"
     model_path = interactive_selection(results_dir, "NILMFormer_*.pt", "Select Model (.pt)")
+    if not model_path: return None, None, None
+
+    # --- AUTO DETECTION LOGIC ---
+    # Example path: result/UKDALE_Dishwasher_1min_0%/128/NILMFormer_0.pt
+    parts = model_path.parts
+    win_size = parts[-2]          # "128"
+    folder_name = parts[-3]       # "UKDALE_Dishwasher_1min_0%"
     
-    # 2. Select Data Directory (Tensors)
-    tensors_root = ROOT / "prepared_data" / "tensors"
-    data_dir = interactive_selection(tensors_root, "*%", "Select Data Directory (Tensors)", is_dir=True)
+    # Guess appliance and percentage
+    tokens = folder_name.split("_")
+    appliance = tokens[1].lower()  # "dishwasher"
+    percentage = tokens[-1]        # "0%"
     
-    # 3. Select CSV Path
+    print(f"\nAuto-detected parameters from model:")
+    print(f"  > Appliance: {appliance}")
+    print(f"  > Window Size: {win_size}")
+    print(f"  > Training %: {percentage}")
+
+    # 2. Select Data Directory (Filtered)
+    tensors_root = ROOT / "prepared_data" / "tensors" / win_size / appliance
+    if not tensors_root.exists():
+        # Fallback if structure is slightly different (e.g. no window size folder first)
+        tensors_root = ROOT / "prepared_data" / "tensors"
+        print(f"\n⚠️  Specific tensor folder not found. Showing all in {tensors_root}")
+        data_dir = interactive_selection(tensors_root, "*%", "Select Data Directory (Tensors)", is_dir=True)
+    else:
+        # Show only % options for this appliance/window
+        data_dir = interactive_selection(tensors_root, "*%", f"Select Test Set for {appliance} ({win_size})", is_dir=True)
+    
+    # 3. Select CSV Path (Filtered)
     csv_root = ROOT / "prepared_data"
-    csv_path = interactive_selection(csv_root, "*.csv", "Select Real Power CSV")
+    csv_pattern = f"*{appliance}*.csv"
+    csv_path = interactive_selection(csv_root, csv_pattern, f"Select Real Power CSV (Filtered for {appliance})")
+    if not csv_path:
+        # Fallback to all CSVs
+        csv_path = interactive_selection(csv_root, "*.csv", "Select Real Power CSV")
     
     return model_path, data_dir, csv_path
 
