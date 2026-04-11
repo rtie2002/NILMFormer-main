@@ -169,10 +169,11 @@ def denormalize(arr, max_val):
 from matplotlib.widgets import Button
 
 class InteractiveBrowser:
-    def __init__(self, preds, trues, aggs, app_name, model_info):
+    def __init__(self, preds, trues, aggs, baseline_preds, app_name, model_info):
         self.preds = preds
         self.trues = trues
         self.aggs = aggs
+        self.baseline_preds = baseline_preds
         self.app_name = app_name
         self.model_info = model_info
         self.total = len(preds)
@@ -183,7 +184,7 @@ class InteractiveBrowser:
         
         # Setup Figure (Academic Style)
         plt.style.use('default') # Light theme
-        self.fig, self.ax = plt.subplots(figsize=(10, 6))
+        self.fig, self.ax = plt.subplots(figsize=(12, 7))
         plt.subplots_adjust(bottom=0.2)
         
         self.update_plot()
@@ -206,17 +207,25 @@ class InteractiveBrowser:
         t = range(L)
         
         # Plotting with academic colors
-        self.ax.fill_between(t, self.aggs[idx], color='lightgray', alpha=0.3, label='Aggregate Power')
-        self.ax.plot(t, self.trues[idx], color='blue', linewidth=1.5, label='Actual Power (GT)')
-        self.ax.plot(t, self.preds[idx], color='red', linestyle='--', linewidth=1.2, label='Predicted Power')
+        self.ax.fill_between(t, self.aggs[idx], color='lightgray', alpha=0.2, label='Aggregate Power')
+        self.ax.plot(t, self.trues[idx], color='blue', linewidth=1.8, label='Actual Power (GT)')
+        
+        # Selected Model Prediction
+        self.ax.plot(t, self.preds[idx], color='red', linestyle='--', linewidth=1.3, label=f'Model Selection')
+        
+        # Baseline (0%) Prediction
+        if self.baseline_preds is not None:
+            self.ax.plot(t, self.baseline_preds[idx], color='black', linestyle=':', label='Baseline (0% Model)', alpha=0.7)
         
         mae = np.mean(np.abs(self.preds[idx] - self.trues[idx]))
-        self.ax.set_title(f"Window {idx}/{self.total-1} | Appliance: {self.app_name.capitalize()}\nModel: {self.model_info} | MAE: {mae:.2f} W", 
-                          fontsize=12, fontweight='bold')
+        title_text = f"Window {idx}/{self.total-1} | Appliance: {self.app_name.capitalize()}\n"
+        title_text += f"{self.model_info} | Window-MAE: {mae:.2f} W"
+        
+        self.ax.set_title(title_text, fontsize=12, fontweight='bold')
         self.ax.set_xlabel("Time Step (min)", fontsize=10)
         self.ax.set_ylabel("Power (Watts)", fontsize=10)
         self.ax.grid(True, linestyle=':', alpha=0.6)
-        self.ax.legend(loc='upper right', frameon=True)
+        self.ax.legend(loc='upper right', frameon=True, fontsize=9)
         self.ax.set_ylim(bottom=-10, top=max(self.aggs[idx].max() * 1.1, 100))
         
         self.fig.canvas.draw_idle()
@@ -295,6 +304,32 @@ def visualize_results():
     trues_w = denormalize(np.concatenate(trues_raw), app_max)
     aggs_w  = denormalize(test_agg[:, 0, :], agg_max)
 
+    # --- 4. OPTIONAL: Load Baseline (0% Model) for Comparison ---
+    baseline_preds_w = None
+    try:
+        # Search for the 0% model folder for the same appliance and window
+        # Example: result/UKDALE_Dishwasher_1min_0%/256/NILMFormer_0.pt
+        baseline_model_pattern = f"*_{selected_app}_*0%/{selected_win}/NILMFormer_0.pt"
+        baseline_models = sorted(list((ROOT / "result").rglob(baseline_model_pattern)))
+        
+        # Avoid reloading if selected model IS the 0% model
+        if baseline_models and baseline_models[0].resolve() != model_path.resolve():
+            print(f"Loading baseline (0%) model for comparison: {baseline_models[0].parent.parent.name}")
+            b_model = load_model(baseline_models[0], device)
+            b_model.float()
+            b_preds_raw = []
+            with torch.no_grad():
+                for batch_agg, _, _ in loader:
+                    batch_agg = batch_agg.to(device).float()
+                    out = b_model(batch_agg)
+                    b_preds_raw.append(out.squeeze(1).cpu().numpy())
+            baseline_preds_w = denormalize(np.concatenate(b_preds_raw), app_max)
+            print("Baseline inference complete.")
+        else:
+            print("Selected model is already the baseline (0%).")
+    except Exception as e:
+        print(f"Skipping baseline comparison due to: {e}")
+
     # Launcher Interactive Browser
     if not model_path or not data_dir:
         print("Selection process incomplete.")
@@ -303,7 +338,7 @@ def visualize_results():
     app_name = selected_app
     model_info = f"{model_path.parent.parent.name} ({model_path.parent.name})"
     
-    InteractiveBrowser(preds_w, trues_w, aggs_w, app_name, model_info)
+    InteractiveBrowser(preds_w, trues_w, aggs_w, baseline_preds_w, app_name, model_info)
 
 if __name__ == "__main__":
     visualize_results()
