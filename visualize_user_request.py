@@ -129,11 +129,25 @@ def get_user_paths():
         if not data_dir.is_absolute():
             data_dir = ROOT / data_dir
 
-    # 5. Locate CSV (Automatic)
-    csv_path = ROOT / "prepared_data" / f"{norm_app}_test__realPower.csv"
-    if not csv_path.exists():
-        # Search for any CSV with appliance name
-        csvs = list((ROOT / "prepared_data").glob(f"*{norm_app}*.csv"))
+    # 5. Locate CSV (Automatic - Smart Search)
+    csv_candidates = [
+        f"{norm_app}_test__realPower.csv",             # washing_machine_...
+        f"{norm_app.replace('_', '')}_test__realPower.csv", # washingmachine_...
+        f"{selected_app.lower()}_test__realPower.csv"   # washingmachine_...
+    ]
+    
+    csv_path = None
+    for cand in csv_candidates:
+        p = ROOT / "prepared_data" / cand
+        if p.exists():
+            csv_path = p
+            break
+            
+    if not csv_path:
+        # Final fallback: search for anything containing the appliance name
+        csvs = list((ROOT / "prepared_data").glob(f"*{norm_app.replace('_', '')}*.csv"))
+        if not csvs:
+            csvs = list((ROOT / "prepared_data").glob(f"*{norm_app}*.csv"))
         csv_path = csvs[0] if csvs else None
     if not data_dir.exists():
         print(f"❌ Error: Test directory not found: {data_dir}")
