@@ -56,47 +56,84 @@ def interactive_selection(root_dir, pattern, prompt_text, is_dir=False):
             print(f"Please enter a number between 1 and {len(items)}.")
 
 def get_user_paths():
-    """Prompt user for model and fully auto-select matching data paths."""
+    """Step-by-step selector: Appliance -> Window -> Model -> Test Set."""
     print("========================================")
-    print("  NILMFormer One-Click Visualizer       ")
+    print("  NILMFormer Professional Selector      ")
     print("========================================")
     
-    # Selection 1: Model
     results_dir = ROOT / "result"
     if not results_dir.exists(): results_dir = ROOT / "results"
-    model_path = interactive_selection(results_dir, "NILMFormer_*.pt", "Select Model (.pt)")
-    if not model_path: return None, None, None
 
-    # --- AUTO DETECTION ---
-    parts = model_path.parts
-    win_size = parts[-2]          # "128"
-    folder_name = parts[-3]       # "UKDALE_Dishwasher_1min_0%"
+    # 1. Select Appliance
+    # Extracts "Dishwasher", "WashingMachine" etc from UKDALE_Dishwasher_...
+    all_folders = [d.name for d in results_dir.iterdir() if d.is_dir() and "_" in d.name]
+    appliances = sorted(list(set([f.split("_")[1] for f in all_folders])))
     
-    tokens = folder_name.split("_")
-    appliance = tokens[1].lower()  # "dishwasher"
-    percentage = tokens[-1]        # "0%"
+    print("\n--- Select Appliance ---")
+    for i, app in enumerate(appliances):
+        print(f"  [{i+1:>2}] {app}")
+    app_idx = int(input(f"Select appliance (1-{len(appliances)}): ") or 1) - 1
+    selected_app = appliances[app_idx]
 
-    # 1. Detect Tensors
-    data_dir = ROOT / "prepared_data" / "tensors" / win_size / appliance / percentage
-    if not data_dir.exists():
-        # Fallback 1: Try without percentage folder if using original data structure
-        data_dir = ROOT / "prepared_data" / "tensors" / win_size / appliance
-        if not data_dir.exists():
-            print(f"\n⚠️  Could not auto-locate tensors at {data_dir}")
-            data_dir = interactive_selection(ROOT / "prepared_data" / "tensors", "*%", "Manually Select Tensors", is_dir=True)
+    # 2. Select Window Size
+    # Find all window size folders for this appliance
+    app_folders = [d for d in results_dir.iterdir() if d.is_dir() and f"_{selected_app}_" in d.name]
+    windows = set()
+    for f in app_folders:
+        for sub in f.iterdir():
+            if sub.is_dir() and sub.name.isdigit():
+                windows.add(sub.name)
+    windows = sorted(list(windows), key=int)
     
-    # 2. Detect CSV
-    csv_path = ROOT / "prepared_data" / f"{appliance}_test__realPower.csv"
+    print(f"\n--- Select Window Size for {selected_app} ---")
+    for i, win in enumerate(windows):
+        print(f"  [{i+1:>2}] {win}")
+    win_idx = int(input(f"Select window size (1-{len(windows)}): ") or 1) - 1
+    selected_win = windows[win_idx]
+
+    # 3. Select Specific Model (Percentage)
+    print(f"\n--- Select Model Version (Filtered) ---")
+    # Find all .pt files matching selected_app and selected_win
+    matching_models = sorted(list(results_dir.rglob(f"*_{selected_app}_*/{selected_win}/NILMFormer_*.pt")))
+    for i, m in enumerate(matching_models):
+        # Show path relative to result/ for clarity
+        rel = m.relative_to(results_dir)
+        print(f"  [{i+1:>2}] {rel}")
+    m_idx = int(input(f"Select model (1-{len(matching_models)}): ") or 1) - 1
+    model_path = matching_models[m_idx]
+
+    # 4. Select Test Dataset
+    # Default to 0% baseline
+    default_test = ROOT / "prepared_data" / "tensors" / selected_win / selected_app.lower() / "0%"
+    print(f"\n--- Test Dataset Selection ---")
+    print(f"Default (Baseline 0%): {default_test.relative_to(ROOT) if default_test.exists() else 'Not found'}")
+    
+    custom_input = input("\n[Press Enter] to use Baseline, or [Paste Folder Path] for custom test set: ").strip()
+    if not custom_input:
+        data_dir = default_test
+    else:
+        # User pasted a string, handle absolute or relative
+        data_dir = Path(custom_input.replace('"', '')) # Strip quotes if pasted as "path"
+        if not data_dir.is_absolute():
+            data_dir = ROOT / data_dir
+
+    # 5. Locate CSV (Automatic)
+    csv_path = ROOT / "prepared_data" / f"{selected_app.lower()}_test__realPower.csv"
     if not csv_path.exists():
-        print(f"\n⚠️  Could not auto-locate CSV at {csv_path}")
-        csv_path = interactive_selection(ROOT / "prepared_data", f"*{appliance}*.csv", "Manually Select CSV")
+        # Search for any CSV with appliance name
+        csvs = list((ROOT / "prepared_data").glob(f"*{selected_app.lower()}*.csv"))
+        csv_path = csvs[0] if csvs else None
 
-    print(f"\n✅ Auto-selected:")
-    print(f"   Model: {model_path.name}")
-    print(f"   Data : {data_dir.relative_to(ROOT) if data_dir else 'None'}")
-    print(f"   CSV  : {csv_path.name if csv_path else 'None'}")
+    if not data_dir.exists():
+        print(f"❌ Error: Test directory not found: {data_dir}")
+        return None, None, None, None
+
+    print(f"\n✅ Selection Finalized:")
+    # Use str() to avoid relative_to error if ROOT is different drive
+    print(f"   Model: {model_path}")
+    print(f"   Data : {data_dir}")
     
-    return model_path, data_dir, csv_path
+    return model_path, data_dir, csv_path, selected_app
 
 def load_model(model_path, device):
     """Load the NILMFormer model from the checkpoint."""
@@ -186,7 +223,7 @@ def visualize_results():
     print(f"--- NILMFormer Academic Visualizer ---")
 
     # --- 1. Get Paths Interactively ---
-    model_path, data_dir, csv_path = get_user_paths()
+    model_path, data_dir, csv_path, selected_app = get_user_paths()
     if not model_path or not data_dir or not csv_path:
         return
 
@@ -239,8 +276,12 @@ def visualize_results():
     aggs_w  = denormalize(test_agg[:, 0, :], agg_max)
 
     # Launcher Interactive Browser
-    app_name = model_path.parts[-3].split("_")[1]
-    model_info = f"{model_path.parts[-3]} ({model_path.parts[-2]})"
+    if not model_path or not data_dir:
+        print("Selection process incomplete.")
+        return
+        
+    app_name = selected_app
+    model_info = f"{model_path.parent.parent.name} ({model_path.parent.name})"
     
     InteractiveBrowser(preds_w, trues_w, aggs_w, app_name, model_info)
 
