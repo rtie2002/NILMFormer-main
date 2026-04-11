@@ -55,6 +55,12 @@ def interactive_selection(root_dir, pattern, prompt_text, is_dir=False):
         except (ValueError, IndexError):
             print(f"Please enter a number between 1 and {len(items)}.")
 
+def normalize_name(name):
+    """Convert WashingMachine to washing_machine for path matching."""
+    import re
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
 def get_user_paths():
     """Step-by-step selector: Appliance -> Window -> Model -> Test Set."""
     print("========================================")
@@ -104,9 +110,15 @@ def get_user_paths():
 
     # 4. Select Test Dataset
     # Default to 0% baseline
-    default_test = ROOT / "prepared_data" / "tensors" / selected_win / selected_app.lower() / "0%"
+    norm_app = normalize_name(selected_app)
+    default_test = ROOT / "prepared_data" / "tensors" / selected_win / norm_app / "0%"
+    
     print(f"\n--- Test Dataset Selection ---")
-    print(f"Default (Baseline 0%): {default_test.relative_to(ROOT) if default_test.exists() else 'Not found'}")
+    try:
+        rel_test = default_test.relative_to(ROOT)
+    except ValueError:
+        rel_test = default_test
+    print(f"Default (Baseline 0%): {rel_test if default_test.exists() else 'Not found'}")
     
     custom_input = input("\n[Press Enter] to use Baseline, or [Paste Folder Path] for custom test set: ").strip()
     if not custom_input:
@@ -118,12 +130,11 @@ def get_user_paths():
             data_dir = ROOT / data_dir
 
     # 5. Locate CSV (Automatic)
-    csv_path = ROOT / "prepared_data" / f"{selected_app.lower()}_test__realPower.csv"
+    csv_path = ROOT / "prepared_data" / f"{norm_app}_test__realPower.csv"
     if not csv_path.exists():
         # Search for any CSV with appliance name
-        csvs = list((ROOT / "prepared_data").glob(f"*{selected_app.lower()}*.csv"))
+        csvs = list((ROOT / "prepared_data").glob(f"*{norm_app}*.csv"))
         csv_path = csvs[0] if csvs else None
-
     if not data_dir.exists():
         print(f"❌ Error: Test directory not found: {data_dir}")
         return None, None, None, None, None
