@@ -56,67 +56,60 @@ def interactive_selection(root_dir, pattern, prompt_text, is_dir=False):
             print(f"Please enter a number between 1 and {len(items)}.")
 
 def get_user_paths():
-    """Prompt user for model and auto-suggest matching data/CSV paths."""
+    """Prompt user for model and fully auto-select matching data paths."""
     print("========================================")
-    print("  NILMFormer Smart Path Selector        ")
+    print("  NILMFormer One-Click Visualizer       ")
     print("========================================")
     
-    # 1. Select Model
+    # Selection 1: Model
     results_dir = ROOT / "result"
     if not results_dir.exists(): results_dir = ROOT / "results"
     model_path = interactive_selection(results_dir, "NILMFormer_*.pt", "Select Model (.pt)")
     if not model_path: return None, None, None
 
-    # --- AUTO DETECTION LOGIC ---
-    # Example path: result/UKDALE_Dishwasher_1min_0%/128/NILMFormer_0.pt
+    # --- AUTO DETECTION ---
     parts = model_path.parts
     win_size = parts[-2]          # "128"
     folder_name = parts[-3]       # "UKDALE_Dishwasher_1min_0%"
     
-    # Guess appliance and percentage
     tokens = folder_name.split("_")
     appliance = tokens[1].lower()  # "dishwasher"
     percentage = tokens[-1]        # "0%"
-    
-    print(f"\nAuto-detected parameters from model:")
-    print(f"  > Appliance: {appliance}")
-    print(f"  > Window Size: {win_size}")
-    print(f"  > Training %: {percentage}")
 
-    # 2. Select Data Directory (Filtered)
-    tensors_root = ROOT / "prepared_data" / "tensors" / win_size / appliance
-    if not tensors_root.exists():
-        # Fallback if structure is slightly different (e.g. no window size folder first)
-        tensors_root = ROOT / "prepared_data" / "tensors"
-        print(f"\n⚠️  Specific tensor folder not found. Showing all in {tensors_root}")
-        data_dir = interactive_selection(tensors_root, "*%", "Select Data Directory (Tensors)", is_dir=True)
-    else:
-        # Show only % options for this appliance/window
-        data_dir = interactive_selection(tensors_root, "*%", f"Select Test Set for {appliance} ({win_size})", is_dir=True)
+    # 1. Detect Tensors
+    data_dir = ROOT / "prepared_data" / "tensors" / win_size / appliance / percentage
+    if not data_dir.exists():
+        # Fallback 1: Try without percentage folder if using original data structure
+        data_dir = ROOT / "prepared_data" / "tensors" / win_size / appliance
+        if not data_dir.exists():
+            print(f"\n⚠️  Could not auto-locate tensors at {data_dir}")
+            data_dir = interactive_selection(ROOT / "prepared_data" / "tensors", "*%", "Manually Select Tensors", is_dir=True)
     
-    # 3. Select CSV Path (Filtered)
-    csv_root = ROOT / "prepared_data"
-    csv_pattern = f"*{appliance}*.csv"
-    csv_path = interactive_selection(csv_root, csv_pattern, f"Select Real Power CSV (Filtered for {appliance})")
-    if not csv_path:
-        # Fallback to all CSVs
-        csv_path = interactive_selection(csv_root, "*.csv", "Select Real Power CSV")
+    # 2. Detect CSV
+    csv_path = ROOT / "prepared_data" / f"{appliance}_test__realPower.csv"
+    if not csv_path.exists():
+        print(f"\n⚠️  Could not auto-locate CSV at {csv_path}")
+        csv_path = interactive_selection(ROOT / "prepared_data", f"*{appliance}*.csv", "Manually Select CSV")
+
+    print(f"\n✅ Auto-selected:")
+    print(f"   Model: {model_path.name}")
+    print(f"   Data : {data_dir.relative_to(ROOT) if data_dir else 'None'}")
+    print(f"   CSV  : {csv_path.name if csv_path else 'None'}")
     
     return model_path, data_dir, csv_path
 
 def load_model(model_path, device):
     """Load the NILMFormer model from the checkpoint."""
+    # We need to peek at the model path to get window size if needed, 
+    # but NILMFormerConfig usually handles defaults.
     cfg = NILMFormerConfig(c_in=1, c_embedding=8, c_out=1)
     model = NILMFormer(cfg).to(device)
     
     ckpt = torch.load(model_path, map_location=device, weights_only=False)
-    # Check common checkpoint keys
     state_dict = ckpt["model_state_dict"] if "model_state_dict" in ckpt else (
                  ckpt["best_model_state_dict"] if "best_model_state_dict" in ckpt else ckpt)
     
-    # Strip DataParallel prefix if present
     state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    
     model.load_state_dict(state_dict)
     model.eval()
     return model
