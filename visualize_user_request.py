@@ -126,14 +126,14 @@ def get_user_paths():
 
     if not data_dir.exists():
         print(f"❌ Error: Test directory not found: {data_dir}")
-        return None, None, None, None
+        return None, None, None, None, None
 
     print(f"\n✅ Selection Finalized:")
-    # Use str() to avoid relative_to error if ROOT is different drive
     print(f"   Model: {model_path}")
     print(f"   Data : {data_dir}")
+    print(f"   CSV  : {csv_path.name if csv_path else 'None'}")
     
-    return model_path, data_dir, csv_path, selected_app
+    return model_path, data_dir, csv_path, str(selected_app), str(selected_win)
 
 def load_model(model_path, device):
     """Load the NILMFormer model from the checkpoint."""
@@ -223,7 +223,7 @@ def visualize_results():
     print(f"--- NILMFormer Academic Visualizer ---")
 
     # --- 1. Get Paths Interactively ---
-    model_path, data_dir, csv_path, selected_app = get_user_paths()
+    model_path, data_dir, csv_path, selected_app, selected_win = get_user_paths()
     if not model_path or not data_dir or not csv_path:
         return
 
@@ -251,6 +251,15 @@ def visualize_results():
 
     # Prepare 4D data
     N, _, L = test_agg.shape
+    
+    # Validation: Ensure windows match model path
+    model_win = selected_win
+    if str(L) != str(model_win):
+        print(f"⚠️  Warning: Tensor window size ({L}) does not match model window size ({model_win}).")
+        print(f"Results may be inaccurate or mismatched.")
+    else:
+        print(f"✅ Window size verified: {L}")
+
     data_4d = np.zeros((N, 2, 10, L))
     data_4d[:, 0, 0:1, :]  = test_agg
     data_4d[:, 0, 2:10, :] = test_time
@@ -287,8 +296,4 @@ def visualize_results():
 
 if __name__ == "__main__":
     visualize_results()
-
     print("\nVisualization complete. If running on a GUI-enabled machine, plots should have appeared.")
-
-if __name__ == "__main__":
-    visualize_results()
