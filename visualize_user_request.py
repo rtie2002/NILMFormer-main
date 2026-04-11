@@ -129,15 +129,16 @@ def visualize_results():
         print("Selection cancelled or failed.")
         return
 
-    # Load Model
-    print(f"\nLoading model: {model_path.name}...")
+    # --- 2. Build & Load model ---
+    print(f"\nBuilding model...")
     try:
         model = load_model(model_path, device)
+        model.float() # ENSURE FLOAT32
     except Exception as e:
         print(f"Error loading model: {e}")
         return
 
-    # Load Tensors
+    # --- 3. Load Tensors ---
     print(f"Loading test tensors from {data_dir.name}...")
     try:
         test_agg   = torch.load(data_dir / "test_agg.pt",   weights_only=False).numpy()
@@ -154,7 +155,6 @@ def visualize_results():
         return
 
     # Prepare 4D data [N, Channels, Vars, Length]
-    # NilmFormer expects Aggregate, Temperature (optional), and Time Embeddings
     N, _, L = test_agg.shape
     data_4d = np.zeros((N, 2, 10, L))
     data_4d[:, 0, 0:1, :]  = test_agg
@@ -169,9 +169,11 @@ def visualize_results():
     trues_raw = []
     
     print("Running inference...")
+    model.eval()
     with torch.no_grad():
         for batch_agg, batch_true, _ in loader:
-            batch_agg = batch_agg.to(device)
+            # CRITICAL FIX: Cast input to float() to match model weight type
+            batch_agg = batch_agg.to(device).float()
             out = model(batch_agg)
             preds_raw.append(out.squeeze(1).cpu().numpy())
             trues_raw.append(batch_true.squeeze(1).cpu().numpy())
@@ -182,11 +184,10 @@ def visualize_results():
 
     # --- PLOTTING ---
     plt.style.use('dark_background')
-    accent_color = '#00d4ff' # Neon Blue
-    gt_color = '#00ff41'     # Matrix Green
-    pred_color = '#ff00c1'   # Cyber Pink
+    accent_color = '#00d4ff'
+    gt_color = '#00ff41'
+    pred_color = '#ff00c1'
     
-    # 1. Random Windows Snapshot
     num_samples = 6
     indices = np.random.choice(len(preds_w), num_samples, replace=False)
     
@@ -217,7 +218,6 @@ def visualize_results():
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
 
-    # 2. Global Overview (Concatenating first 50 windows)
     print("Generating global overview...")
     n_global = min(50, len(preds_w))
     p_global = preds_w[:n_global].flatten()
