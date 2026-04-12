@@ -120,16 +120,36 @@ def get_user_paths():
         rel_test = default_test
     print(f"Default (Baseline 0%): {rel_test if default_test.exists() else 'Not found'}")
     
-    custom_input = input("\n[Press Enter] to use Baseline, or [Paste Folder Path] for custom test set: ").strip()
+    custom_input = input("\n[Press Enter] to use Baseline, or [Paste Tensor Folder Path] for custom test set: ").strip()
     if not custom_input:
         data_dir = default_test
     else:
         # User pasted a string, handle absolute or relative
-        data_dir = Path(custom_input.replace('"', '')) # Strip quotes if pasted as "path"
+        raw_path = Path(custom_input.replace('"', '')) # Strip quotes
+        
+        # Smart detection: If user pasted a CSV file instead of folder
+        if raw_path.is_file():
+            print(f"⚠️ You pasted a file path. Switching to its directory...")
+            data_dir = raw_path.parent
+        else:
+            data_dir = raw_path
+            
         if not data_dir.is_absolute():
             data_dir = ROOT / data_dir
 
-    # 5. Locate CSV (Automatic - Smart Search)
+    # 5. Smart CSV & Tensor Validation
+    if not data_dir.exists():
+        print(f"❌ Error: Directory not found: {data_dir}")
+        return None, None, None, None, None
+        
+    # If the folder doesn't contain test_agg.pt, maybe it's the wrong level?
+    if not (data_dir / "test_agg.pt").exists():
+        print(f"⚠️ Warning: No tensors found in {data_dir.name}")
+        # Try to suggest correct folder based on appliance and window
+        suggested = ROOT / "prepared_data" / "tensors" / selected_win / norm_app / "0%"
+        print(f"Suggested tensor folder: {suggested}")
+    
+    # 6. Locate CSV (Automatic - Smart Search)
     csv_candidates = [
         f"{norm_app}_test__realPower.csv",             # washing_machine_...
         f"{norm_app.replace('_', '')}_test__realPower.csv", # washingmachine_...
@@ -145,13 +165,11 @@ def get_user_paths():
             
     if not csv_path:
         # Final fallback: search for anything containing the appliance name
-        csvs = list((ROOT / "prepared_data").glob(f"*{norm_app.replace('_', '')}*.csv"))
+        csv_search_key = norm_app.replace('_', '')
+        csvs = list((ROOT / "prepared_data").glob(f"*{csv_search_key}*.csv"))
         if not csvs:
             csvs = list((ROOT / "prepared_data").glob(f"*{norm_app}*.csv"))
         csv_path = csvs[0] if csvs else None
-    if not data_dir.exists():
-        print(f"❌ Error: Test directory not found: {data_dir}")
-        return None, None, None, None, None
 
     print(f"\n✅ Selection Finalized:")
     print(f"   Model: {model_path}")
@@ -277,8 +295,33 @@ def visualize_results():
         test_state = torch.load(data_dir / "test_state.pt", weights_only=False).numpy()
         stats      = torch.load(data_dir / "stats.pt",      weights_only=False)
         
-        app_max = float(stats["app_max"])
-        agg_max = float(stats["agg_max"])
+        app_max_stat = float(stats["app_max"])
+        agg_max_stat = float(stats["agg_max"])
+        
+        # SMART SCALE DETECTION
+        # Check if test_power was scaled by app_max or agg_max
+        raw_max = test_power.max()
+        if raw_max > 0:
+            val_if_app = raw_max * app_max_stat
+            val_if_agg = raw_max * agg_max_stat
+            
+            # If app_max_stat is same as agg_max_stat, no ambiguity
+            if abs(app_max_stat - agg_max_stat) < 1.0:
+                print("📝 Detection: Appliance and Aggregate share same scale.")
+                final_app_max = agg_max_stat
+            elif raw_max < 0.3 and val_if_app < 500 and val_if_agg > 1000:
+                # SameAsPower mode: raw is small, app_max gives tiny results, agg_max gives realistic Watts
+                print(f"📝 Detection: Appliance scaled using Aggregate Max ({agg_max_stat}W)")
+                final_app_max = agg_max_stat
+            else:
+                print(f"📝 Detection: Appliance scaled using individual Max ({app_max_stat}W)")
+                final_app_max = app_max_stat
+        else:
+            final_app_max = app_max_stat
+
+        app_max = final_app_max
+        agg_max = agg_max_stat
+        
     except Exception as e:
         print(f"Error loading tensors: {e}")
         return
