@@ -200,6 +200,8 @@ def denormalize(arr, max_val):
 
 from matplotlib.widgets import Button
 
+from matplotlib.widgets import Button, Slider
+
 class InteractiveBrowser:
     def __init__(self, preds, trues, aggs, baseline_preds, app_name, model_info):
         self.preds = preds
@@ -210,65 +212,110 @@ class InteractiveBrowser:
         self.model_info = model_info
         self.total = len(preds)
         
-        # Start at first window where there is actual power (if any)
-        on_windows = [i for i, t in enumerate(trues) if np.sum(t) > 5] # >5W threshold
+        # UI State
+        on_windows = [i for i, t in enumerate(trues) if np.max(t) > 20] # Filter empty
         self.curr_idx = on_windows[0] if on_windows else 0
+        self.auto_scale = True
         
-        # Setup Figure (Academic Style)
-        plt.style.use('default') # Light theme
-        self.fig, self.ax = plt.subplots(figsize=(12, 7))
-        plt.subplots_adjust(bottom=0.2)
+        # Setup Figure
+        plt.style.use('bmh') # Academic look
+        self.fig = plt.figure(figsize=(14, 8))
+        gs = plt.GridSpec(2, 1, height_ratios=[10, 1])
+        self.ax = self.fig.add_subplot(gs[0])
+        plt.subplots_adjust(bottom=0.25, left=0.07, right=0.95, top=0.9)
         
-        self.update_plot()
+        # Add Slider for Fast Scrolling
+        ax_slider = plt.axes([0.15, 0.1, 0.7, 0.03])
+        self.slider = Slider(ax_slider, 'Window ', 0, self.total-1, valinit=self.curr_idx, valfmt='%0.0f')
+        self.slider.on_changed(self.on_slider)
+
+        # Add Controls Buttons
+        ax_prev = plt.axes([0.15, 0.03, 0.08, 0.05])
+        ax_next = plt.axes([0.24, 0.03, 0.08, 0.05])
+        ax_fit  = plt.axes([0.35, 0.03, 0.12, 0.05])
         
-        # Add buttons
-        ax_prev = plt.axes([0.7, 0.05, 0.1, 0.075])
-        ax_next = plt.axes([0.81, 0.05, 0.1, 0.075])
-        self.btn_prev = Button(ax_prev, 'Previous', color='#f0f0f0', hovercolor='#e0e0e0')
-        self.btn_next = Button(ax_next, 'Next', color='#f0f0f0', hovercolor='#e0e0e0')
+        self.btn_prev = Button(ax_prev, '<< Prev', color='white', hovercolor='0.95')
+        self.btn_next = Button(ax_next, 'Next >>', color='white', hovercolor='0.95')
+        self.btn_fit  = Button(ax_fit, 'Toggle Auto-Fit', color='white', hovercolor='0.95')
         
         self.btn_prev.on_clicked(self.prev)
         self.btn_next.on_clicked(self.next)
+        self.btn_fit.on_clicked(self.toggle_fit)
         
+        # Keyboard support
+        self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+        
+        print(f"\n💡 Interaction UI Loaded:")
+        print(f"   - [Mouse]: Drag the slider for FAST SCROLLING.")
+        print(f"   - [Arrows]: Left/Right to flip windows.")
+        print(f"   - [PgUp/PgDn]: Skip 10 windows at a time.")
+        print(f"   - [A]: Toggle Auto-scale.")
+
+        self.update_plot()
         plt.show()
 
     def update_plot(self):
         self.ax.clear()
-        idx = self.curr_idx
+        idx = int(self.curr_idx)
         L = self.preds.shape[1]
         t = range(L)
         
-        # Plotting with academic colors
-        self.ax.fill_between(t, self.aggs[idx], color='lightgray', alpha=0.2, label='Aggregate Power')
-        self.ax.plot(t, self.trues[idx], color='blue', linewidth=1.8, label='Actual Power (GT)')
+        # Plotting
+        self.ax.fill_between(t, self.aggs[idx], color='gray', alpha=0.15, label='Aggregate Power')
+        self.ax.plot(t, self.trues[idx], color='#1f77b4', linewidth=2.0, label='Ground Truth (Blue)', alpha=0.9)
+        self.ax.plot(t, self.preds[idx], color='#d62728', linestyle='--', linewidth=1.5, label='Selected Model (Red)')
         
-        # Selected Model Prediction
-        self.ax.plot(t, self.preds[idx], color='red', linestyle='--', linewidth=1.3, label=f'Model Selection')
-        
-        # Baseline (0%) Prediction
         if self.baseline_preds is not None:
-            self.ax.plot(t, self.baseline_preds[idx], color='black', linestyle=':', label='Baseline (0% Model)', alpha=0.7)
+            self.ax.plot(t, self.baseline_preds[idx], color='k', linestyle=':', label='Baseline (0%)', alpha=0.6)
         
+        # Stats
         mae = np.mean(np.abs(self.preds[idx] - self.trues[idx]))
-        title_text = f"Window {idx}/{self.total-1} | Appliance: {self.app_name.capitalize()}\n"
-        title_text += f"{self.model_info} | Window-MAE: {mae:.2f} W"
+        peak_true = np.max(self.trues[idx])
+        peak_pred = np.max(self.preds[idx])
         
-        self.ax.set_title(title_text, fontsize=12, fontweight='bold')
-        self.ax.set_xlabel("Time Step (min)", fontsize=10)
-        self.ax.set_ylabel("Power (Watts)", fontsize=10)
-        self.ax.grid(True, linestyle=':', alpha=0.6)
-        self.ax.legend(loc='upper right', frameon=True, fontsize=9)
-        self.ax.set_ylim(bottom=-10, top=max(self.aggs[idx].max() * 1.1, 100))
+        title = f"Appliance: {self.app_name.upper()} | Window {idx}/{self.total-1}\n"
+        title += f"MAE: {mae:.1f}W | GT Peak: {peak_true:.1f}W | Pred Peak: {peak_pred:.1f}W"
         
+        self.ax.set_title(title, fontsize=11, fontweight='bold', pad=15)
+        self.ax.set_xlabel("Time Step (min)")
+        self.ax.set_ylabel("Power (Watts)")
+        self.ax.grid(True, linestyle='--', alpha=0.3)
+        self.ax.legend(loc='upper right', framealpha=0.9)
+        
+        if self.auto_scale:
+            ymax = max(np.max(self.aggs[idx]), np.max(self.trues[idx]), 100)
+            self.ax.set_ylim(-10, ymax * 1.15)
+        else:
+            self.ax.set_ylim(-50, max(np.max(self.preds), np.max(self.trues)) * 1.2)
+            
         self.fig.canvas.draw_idle()
 
-    def next(self, event):
-        self.curr_idx = (self.curr_idx + 1) % self.total
+    def on_slider(self, val):
+        self.curr_idx = int(val)
         self.update_plot()
 
+    def next(self, event):
+        self.curr_idx = min(self.total - 1, self.curr_idx + 1)
+        self.slider.set_val(self.curr_idx)
+
     def prev(self, event):
-        self.curr_idx = (self.curr_idx - 1) % self.total
+        self.curr_idx = max(0, self.curr_idx - 1)
+        self.slider.set_val(self.curr_idx)
+        
+    def toggle_fit(self, event):
+        self.auto_scale = not self.auto_scale
         self.update_plot()
+
+    def on_key(self, event):
+        if event.key == 'right': self.next(None)
+        elif event.key == 'left': self.prev(None)
+        elif event.key == 'pageup':
+            self.curr_idx = min(self.total - 1, self.curr_idx + 10)
+            self.slider.set_val(self.curr_idx)
+        elif event.key == 'pagedown':
+            self.curr_idx = max(0, self.curr_idx - 10)
+            self.slider.set_val(self.curr_idx)
+        elif event.key == 'a': self.toggle_fit(None)
 
 def visualize_results():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
