@@ -357,8 +357,10 @@ def visualize_results():
             preds_raw.append(out.squeeze(1).cpu().numpy())
             trues_raw.append(batch_true.squeeze(1).cpu().numpy())
 
-    preds_w = denormalize(np.concatenate(preds_raw), app_max)
-    trues_w = denormalize(np.concatenate(trues_raw), app_max)
+    # --- 5. Denormalize Results ---
+    # NOTE: Predictions scale usually follows agg_max in SameAsPower mode
+    preds_w = denormalize(np.concatenate(preds_raw), agg_max) 
+    trues_w = denormalize(np.concatenate(trues_raw), app_max) 
     aggs_w  = denormalize(test_agg[:, 0, :], agg_max)
 
     # --- 4. OPTIONAL: Load Baseline (0% Model) for Comparison ---
