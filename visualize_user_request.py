@@ -405,22 +405,20 @@ def visualize_results():
             trues_raw.append(batch_true.squeeze(1).cpu().numpy())
 
     # --- 5. Denormalize Results ---
-    # NOTE: Predictions scale usually follows agg_max in SameAsPower mode
-    preds_w = denormalize(np.concatenate(preds_raw), agg_max) 
+    # REVERT: Use app_max for ALL appliance predictions.
+    # The previous agg_max fix was incorrect because it led to impossible wattage.
+    preds_w = denormalize(np.concatenate(preds_raw), app_max) 
     trues_w = denormalize(np.concatenate(trues_raw), app_max) 
     aggs_w  = denormalize(test_agg[:, 0, :], agg_max)
 
-    # --- 4. OPTIONAL: Load Baseline (0% Model) for Comparison ---
+    # --- 6. Load Baseline (0% Model) for Comparison ---
     baseline_preds_w = None
     try:
-        # Search for the 0% model folder for the same appliance and window
-        # Example: result/UKDALE_Dishwasher_1min_0%/256/NILMFormer_0.pt
         baseline_model_pattern = f"*_{selected_app}_*0%/{selected_win}/NILMFormer_0.pt"
         baseline_models = sorted(list((ROOT / "result").rglob(baseline_model_pattern)))
         
-        # Avoid reloading if selected model IS the 0% model
         if baseline_models and baseline_models[0].resolve() != model_path.resolve():
-            print(f"Loading baseline (0%) model for comparison: {baseline_models[0].parent.parent.name}")
+            print(f"Loading baseline (0%) model: {baseline_models[0].parent.parent.name}")
             b_model = load_model(baseline_models[0], device)
             b_model.float()
             b_preds_raw = []
@@ -429,6 +427,7 @@ def visualize_results():
                     batch_agg = batch_agg.to(device).float()
                     out = b_model(batch_agg)
                     b_preds_raw.append(out.squeeze(1).cpu().numpy())
+            # Baseline also uses app_max
             baseline_preds_w = denormalize(np.concatenate(b_preds_raw), app_max)
             print("Baseline inference complete.")
         else:
