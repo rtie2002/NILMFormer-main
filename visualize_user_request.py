@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import re
 from pathlib import Path
 
 # --- Configuration & Paths ---
@@ -57,7 +58,6 @@ def interactive_selection(root_dir, pattern, prompt_text, is_dir=False):
 
 def normalize_name(name):
     """Convert WashingMachine to washing_machine for path matching."""
-    import re
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
@@ -242,14 +242,20 @@ class InteractiveBrowser:
         self.btn_next.on_clicked(self.next)
         self.btn_fit.on_clicked(self.toggle_fit)
         
-        # Keyboard support
+        # Keyboard & Mouse support
         self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+        self.fig.canvas.mpl_connect('motion_notify_event', self.on_hover)
+        
+        # Cursor elements (will be re-initialized in update_plot)
+        self.cursor_line = None
+        self.cursor_text = None
         
         print(f"\n💡 Interaction UI Loaded:")
         print(f"   - [Mouse]: Drag the slider for FAST SCROLLING.")
         print(f"   - [Arrows]: Left/Right to flip windows.")
         print(f"   - [PgUp/PgDn]: Skip 10 windows at a time.")
         print(f"   - [A]: Toggle Auto-scale.")
+        print(f"   - [Hover]: Move cursor over plot to see values.")
 
         self.update_plot()
         plt.show()
@@ -260,10 +266,15 @@ class InteractiveBrowser:
         L = self.preds.shape[1]
         t = range(L)
         
+        # Extract Injection percentage from model_info
+        # model_info is like "UKDALE_Dishwasher_100% (599)"
+        inj_match = re.search(r'(\d+%)', str(self.model_info))
+        inj_label = inj_match.group(1) if inj_match else "Selected"
+        
         # Plotting
         self.ax.fill_between(t, self.aggs[idx], color='gray', alpha=0.15, label='Aggregate Power')
         self.ax.plot(t, self.trues[idx], color='#1f77b4', linewidth=2.0, label='Ground Truth (Blue)', alpha=0.9)
-        self.ax.plot(t, self.preds[idx], color='#d62728', linestyle='--', linewidth=1.5, label='Selected Model (Red)')
+        self.ax.plot(t, self.preds[idx], color='#d62728', linestyle='--', linewidth=1.5, label=f'Injection Ratio ({inj_label}) (Red)')
         
         if self.baseline_preds is not None:
             self.ax.plot(t, self.baseline_preds[idx], color='k', linestyle=':', label='Baseline (0%)', alpha=0.6)
@@ -273,7 +284,7 @@ class InteractiveBrowser:
         peak_true = np.max(self.trues[idx])
         peak_pred = np.max(self.preds[idx])
         
-        title = f"Appliance: {self.app_name.upper()} | Window {idx}/{self.total-1}\n"
+        title = f"Appliance: {self.app_name.upper()} ({inj_label} Injection) | Window {idx}/{self.total-1}\n"
         title += f"MAE: {mae:.1f}W | GT Peak: {peak_true:.1f}W | Pred Peak: {peak_pred:.1f}W"
         
         self.ax.set_title(title, fontsize=11, fontweight='bold', pad=15)
@@ -288,7 +299,38 @@ class InteractiveBrowser:
         else:
             self.ax.set_ylim(-50, max(np.max(self.preds), np.max(self.trues)) * 1.2)
             
+        # Re-add Cursor elements after clear
+        self.cursor_line = self.ax.axvline(x=0, color='gray', linestyle=':', alpha=0.5, visible=False)
+        self.cursor_text = self.ax.text(0.02, 0.95, '', transform=self.ax.transAxes, 
+                                        verticalalignment='top', fontsize=10, fontweight='bold',
+                                        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='#d62728'),
+                                        visible=False)
+            
         self.fig.canvas.draw_idle()
+
+    def on_hover(self, event):
+        if event.inaxes == self.ax and self.cursor_line is not None:
+            x = int(event.xdata + 0.5) if event.xdata is not None else -1
+            idx = int(self.curr_idx)
+            if 0 <= x < self.preds.shape[1]:
+                self.cursor_line.set_xdata([x])
+                self.cursor_line.set_visible(True)
+                
+                # Extract percentage for hover tooltip terminology
+                inj_match = re.search(r'(\d+%)', str(self.model_info))
+                inj_label = inj_match.group(1) if inj_match else "Pred"
+                
+                txt = f"Timestep: {x} min\n"
+                txt += f"Ground Truth: {self.trues[idx][x]:.1f}W\n"
+                txt += f"Injection Ratio ({inj_label}): {self.preds[idx][x]:.1f}W"
+                
+                self.cursor_text.set_text(txt)
+                self.cursor_text.set_visible(True)
+                self.fig.canvas.draw_idle()
+            else:
+                self.cursor_line.set_visible(False)
+                self.cursor_text.set_visible(False)
+                self.fig.canvas.draw_idle()
 
     def on_slider(self, val):
         self.curr_idx = int(val)
