@@ -216,6 +216,7 @@ class InteractiveBrowser:
         on_windows = [i for i, t in enumerate(trues) if np.max(t) > 20] # Filter empty
         self.curr_idx = on_windows[0] if on_windows else 0
         self.auto_scale = True
+        self.double_window = False
         
         # Setup Figure
         plt.style.use('bmh') # Academic look
@@ -242,6 +243,10 @@ class InteractiveBrowser:
         self.btn_next.on_clicked(self.next)
         self.btn_fit.on_clicked(self.toggle_fit)
         
+        ax_double = plt.axes([0.48, 0.03, 0.15, 0.05])
+        self.btn_double = Button(ax_double, 'Double Window: OFF', color='white', hovercolor='0.95')
+        self.btn_double.on_clicked(self.toggle_double)
+        
         # Keyboard & Mouse support
         self.fig.canvas.mpl_connect('key_press_event', self.on_key)
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_hover)
@@ -255,6 +260,8 @@ class InteractiveBrowser:
         print(f"   - [Arrows]: Left/Right to flip windows.")
         print(f"   - [PgUp/PgDn]: Skip 10 windows at a time.")
         print(f"   - [A]: Toggle Auto-scale.")
+        print(f"   - [D]: Toggle Double Window mode.")
+        print(f"   - [Hover]: Move cursor over plot to see values.")
         print(f"   - [Hover]: Move cursor over plot to see values.")
 
         self.update_plot()
@@ -263,28 +270,45 @@ class InteractiveBrowser:
     def update_plot(self):
         self.ax.clear()
         idx = int(self.curr_idx)
-        L = self.preds.shape[1]
+        
+        # Determine data based on mode
+        if self.double_window and idx < self.total - 1:
+            idx_next = idx + 1
+            pred_data = np.concatenate([self.preds[idx], self.preds[idx_next]])
+            true_data = np.concatenate([self.trues[idx], self.trues[idx_next]])
+            agg_data  = np.concatenate([self.aggs[idx], self.aggs[idx_next]])
+            base_data = np.concatenate([self.baseline_preds[idx], self.baseline_preds[idx_next]]) if self.baseline_preds is not None else None
+            window_info = f"Windows {idx}-{idx_next}"
+        else:
+            pred_data = self.preds[idx]
+            true_data = self.trues[idx]
+            agg_data  = self.aggs[idx]
+            base_data = self.baseline_preds[idx] if self.baseline_preds is not None else None
+            window_info = f"Window {idx}"
+            
+        L = len(pred_data)
+        self.curr_L = L # Store for hover
         t = range(L)
         
         # Extract Injection percentage from model_info
-        # model_info is like "UKDALE_Dishwasher_100% (599)"
         inj_match = re.search(r'(\d+%)', str(self.model_info))
         inj_label = inj_match.group(1) if inj_match else "Selected"
         
         # Plotting
-        self.ax.fill_between(t, self.aggs[idx], color='gray', alpha=0.15, label='Aggregate Power')
-        self.ax.plot(t, self.trues[idx], color='#1f77b4', linewidth=2.0, label='Ground Truth (Blue)', alpha=0.9)
-        self.ax.plot(t, self.preds[idx], color='#d62728', linestyle='--', linewidth=1.5, label=f'Injection Ratio ({inj_label}) (Red)')
+        self.ax.fill_between(t, agg_data, color='gray', alpha=0.15, label='Aggregate Power')
+        self.ax.plot(t, true_data, color='#1f77b4', linewidth=2.0, label='Ground Truth (Blue)', alpha=0.9)
+        self.ax.plot(t, pred_data, color='#d62728', linestyle='--', linewidth=1.5, label=f'Injection Ratio ({inj_label}) (Red)')
         
-        if self.baseline_preds is not None:
-            self.ax.plot(t, self.baseline_preds[idx], color='k', linestyle=':', label='Baseline (0%)', alpha=0.6)
+        if base_data is not None:
+            self.ax.plot(t, base_data, color='k', linestyle=':', label='Baseline (0%)', alpha=0.6)
         
         # Stats
-        mae = np.mean(np.abs(self.preds[idx] - self.trues[idx]))
-        peak_true = np.max(self.trues[idx])
-        peak_pred = np.max(self.preds[idx])
+        mae = np.mean(np.abs(pred_data - true_data))
+        peak_true = np.max(true_data)
+        peak_pred = np.max(pred_data)
         
-        title = f"Appliance: {self.app_name.upper()} ({inj_label} Injection) | Window {idx}/{self.total-1}\n"
+        mode_str = "Double Mode" if self.double_window else "Single Mode"
+        title = f"Appliance: {self.app_name.upper()} ({inj_label} Inj) | {window_info}/{self.total-1} [{mode_str}]\n"
         title += f"MAE: {mae:.1f}W | GT Peak: {peak_true:.1f}W | Pred Peak: {peak_pred:.1f}W"
         
         self.ax.set_title(title, fontsize=11, fontweight='bold', pad=15)
@@ -294,7 +318,7 @@ class InteractiveBrowser:
         self.ax.legend(loc='upper right', framealpha=0.9)
         
         if self.auto_scale:
-            ymax = max(np.max(self.aggs[idx]), np.max(self.trues[idx]), 100)
+            ymax = max(np.max(agg_data), np.max(true_data), 100)
             self.ax.set_ylim(-10, ymax * 1.15)
         else:
             self.ax.set_ylim(-50, max(np.max(self.preds), np.max(self.trues)) * 1.2)
@@ -312,17 +336,28 @@ class InteractiveBrowser:
         if event.inaxes == self.ax and self.cursor_line is not None:
             x = int(event.xdata + 0.5) if event.xdata is not None else -1
             idx = int(self.curr_idx)
-            if 0 <= x < self.preds.shape[1]:
+            
+            # Use current displayed data for hover values
+            if 0 <= x < self.curr_L:
                 self.cursor_line.set_xdata([x])
                 self.cursor_line.set_visible(True)
                 
-                # Extract percentage for hover tooltip terminology
+                # Fetch values from the plot data actually displayed
+                # To be efficient we can slice from original data
+                if self.double_window and idx < self.total - 1:
+                    idx_next = idx + 1
+                    full_true = np.concatenate([self.trues[idx], self.trues[idx_next]])
+                    full_pred = np.concatenate([self.preds[idx], self.preds[idx_next]])
+                else:
+                    full_true = self.trues[idx]
+                    full_pred = self.preds[idx]
+
                 inj_match = re.search(r'(\d+%)', str(self.model_info))
                 inj_label = inj_match.group(1) if inj_match else "Pred"
                 
                 txt = f"Timestep: {x} min\n"
-                txt += f"Ground Truth: {self.trues[idx][x]:.1f}W\n"
-                txt += f"Injection Ratio ({inj_label}): {self.preds[idx][x]:.1f}W"
+                txt += f"Ground Truth: {full_true[x]:.1f}W\n"
+                txt += f"Injection Ratio ({inj_label}): {full_pred[x]:.1f}W"
                 
                 self.cursor_text.set_text(txt)
                 self.cursor_text.set_visible(True)
@@ -358,6 +393,13 @@ class InteractiveBrowser:
             self.curr_idx = max(0, self.curr_idx - 10)
             self.slider.set_val(self.curr_idx)
         elif event.key == 'a': self.toggle_fit(None)
+        elif event.key == 'd': self.toggle_double(None)
+        
+    def toggle_double(self, event):
+        self.double_window = not self.double_window
+        label = f"Double Window: {'ON' if self.double_window else 'OFF'}"
+        self.btn_double.label.set_text(label)
+        self.update_plot()
 
 def visualize_results():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
