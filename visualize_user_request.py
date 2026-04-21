@@ -432,44 +432,73 @@ class InteractiveBrowser:
         inj_match = re.search(r'(\d+%)', str(self.model_info))
         inj_label = inj_match.group(1) if inj_match else "Selected"
         
-        # Create Square Figure
-        export_fig = plt.figure(figsize=(8, 8))
-        ext_ax = export_fig.add_subplot(111)
+        # --- Publication-Quality Figure ---
+        plt.rcParams.update({
+            "font.family": "serif",
+            "font.serif": ["Times New Roman", "Palatino", "DejaVu Serif"],
+            "mathtext.fontset": "stix",
+        })
+        
+        export_fig, ext_ax = plt.subplots(figsize=(8, 8), dpi=150)
         
         L = len(pred_data)
         t = range(L)
         
-        # Use a more premium color palette for paper
-        ext_ax.fill_between(t, agg_data, color='#f0f0f0', alpha=0.8, label='Aggregate Power')
-        ext_ax.plot(t, true_data, color='#0056b3', linewidth=2.5, label='Ground Truth', alpha=1.0)
-        ext_ax.plot(t, pred_data, color='#cc0000', linestyle='--', linewidth=2.0, 
-                    label=f'Injection Ratio ({inj_label})')
+        # --- Color Palette (Curated for contrast & print clarity) ---
+        AGG_COLOR      = '#B0BEC5'   # Blue-Grey (visible but subordinate)
+        GT_COLOR       = '#1565C0'   # Deep Blue (anchor)
+        PROPOSED_COLOR = '#C62828'   # Deep Red (hero)
+        BASELINE_COLOR = '#546E7A'   # Slate Gray (clear but secondary)
         
+        # Layer 1: Aggregate Power — VISIBLE fill + outline
+        ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.25, zorder=1)
+        ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.0, alpha=0.6,
+                    label='Aggregate Power', zorder=1)
+        
+        # Layer 2: Ground Truth — solid, thick anchor line
+        ext_ax.plot(t, true_data, color=GT_COLOR, linewidth=2.5,
+                    label='Ground Truth', zorder=2)
+        
+        # Layer 3: Proposed Method — dashed, on top
+        ext_ax.plot(t, pred_data, color=PROPOSED_COLOR, linestyle='--', linewidth=2.0,
+                    label=f'Injection Ratio ({inj_label})', zorder=4)
+        
+        # Layer 4: Baseline — clearly visible dashed (NOT dotted)
         if base_data is not None:
-            ext_ax.plot(t, base_data, color='#333333', linestyle=':', linewidth=1.5, label='Baseline (0%)', alpha=0.7)
+            ext_ax.plot(t, base_data, color=BASELINE_COLOR, linestyle=(0, (5, 3)),
+                        linewidth=1.8, label='Baseline (0%)', alpha=0.85, zorder=3)
             
-        # Publication styling
-        ext_ax.set_title(self.app_name.upper(), fontsize=20, fontweight='bold', pad=15)
-        ext_ax.set_xlabel("Time (minutes)", fontsize=16, fontweight='bold')
-        ext_ax.set_ylabel("p(W)", fontsize=16, fontweight='bold')
-        ext_ax.set_xlim(0, L)
+        # --- Axes & Labels (LaTeX-style) ---
+        ext_ax.set_title(self.app_name.upper(), fontsize=18, fontweight='bold', pad=20)
+        ext_ax.set_xlabel("Time (minutes)", fontsize=14, fontweight='bold')
+        ext_ax.set_ylabel(r"$P$ (W)", fontsize=14, fontweight='bold', rotation=90)
         
-        if self.auto_scale:
-            ymax = max(np.max(agg_data), np.max(true_data), 100)
-            ext_ax.set_ylim(-10, ymax * 1.15)
-        else:
-            ext_ax.set_ylim(-20, max(np.max(self.preds), np.max(self.trues)) * 1.3)
-            
-        ext_ax.grid(True, linestyle='-', alpha=0.2)
-        ext_ax.legend(loc='upper right', fontsize=12, frameon=True, framealpha=1.0)
+        # CRITICAL: Copy exact scale from interactive view (what you see = what you get)
+        ext_ax.set_xlim(self.ax.get_xlim())
+        ext_ax.set_ylim(self.ax.get_ylim())
+        
+        # --- Clean Grid & Spines ---
+        ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
+        ext_ax.spines['top'].set_visible(False)
+        ext_ax.spines['right'].set_visible(False)
+        ext_ax.tick_params(axis='both', labelsize=12)
+        
+        # --- Legend ---
+        ext_ax.legend(loc='upper right', fontsize=11, frameon=True, 
+                      framealpha=0.95, edgecolor='#BDBDBD', fancybox=True)
+        
+        export_fig.tight_layout()
         
         # Save
         filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
-        export_fig.savefig(filename, dpi=300, bbox_inches='tight')
+        export_fig.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close(export_fig)
         
-        print(f"\n✨ High-resolution square plot saved: {filename}")
-        print(f"   DPI: 300 | Size: 8x8 inches")
+        # Reset rcParams so interactive plot isn't affected
+        plt.rcParams.update(plt.rcParamsDefault)
+        
+        print(f"\n✨ Publication-quality plot saved: {filename}")
+        print(f"   DPI: 300 | Size: 8×8 inches | Font: Serif")
 
 def visualize_results():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
