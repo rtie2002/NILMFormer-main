@@ -220,8 +220,8 @@ class InteractiveBrowser:
         
         # Setup Figure
         plt.style.use('bmh') # Academic look
-        self.fig = plt.figure(figsize=(14, 8))
-        gs = plt.GridSpec(2, 1, height_ratios=[10, 1])
+        self.fig = plt.figure(figsize=(10, 10)) # More square for interactive view
+        gs = plt.GridSpec(2, 1, height_ratios=[12, 1])
         self.ax = self.fig.add_subplot(gs[0])
         plt.subplots_adjust(bottom=0.25, left=0.07, right=0.95, top=0.9)
         
@@ -246,6 +246,10 @@ class InteractiveBrowser:
         ax_double = plt.axes([0.48, 0.03, 0.15, 0.05])
         self.btn_double = Button(ax_double, 'Double Window: OFF', color='white', hovercolor='0.95')
         self.btn_double.on_clicked(self.toggle_double)
+
+        ax_save = plt.axes([0.65, 0.03, 0.15, 0.05])
+        self.btn_save = Button(ax_save, '💾 Save for Paper', color='#e1f5fe', hovercolor='0.95')
+        self.btn_save.on_clicked(self.save_for_paper)
         
         # Keyboard & Mouse support
         self.fig.canvas.mpl_connect('key_press_event', self.on_key)
@@ -261,6 +265,7 @@ class InteractiveBrowser:
         print(f"   - [PgUp/PgDn]: Skip 10 windows at a time.")
         print(f"   - [A]: Toggle Auto-scale.")
         print(f"   - [D]: Toggle Double Window mode.")
+        print(f"   - [S]: Save high-res square plot for paper.")
         print(f"   - [Hover]: Move cursor over plot to see values.")
         print(f"   - [Hover]: Move cursor over plot to see values.")
 
@@ -308,20 +313,23 @@ class InteractiveBrowser:
         peak_pred = np.max(pred_data)
         
         mode_str = "Double Mode" if self.double_window else "Single Mode"
-        title = f"Appliance: {self.app_name.upper()} ({inj_label} Inj) | {window_info}/{self.total-1} [{mode_str}]\n"
-        title += f"MAE: {mae:.1f}W | GT Peak: {peak_true:.1f}W | Pred Peak: {peak_pred:.1f}W"
+        # Clean Title & Labels for Paper
+        title = f"{self.app_name.upper()}"
+        self.ax.set_title(title, fontsize=16, fontweight='bold', pad=25)
+        self.ax.set_xlabel("Time (minutes)", fontsize=13, fontweight='bold')
+        self.ax.set_ylabel("p(W)", fontsize=13, fontweight='bold')
         
-        self.ax.set_title(title, fontsize=11, fontweight='bold', pad=15)
-        self.ax.set_xlabel("Time Step (min)")
-        self.ax.set_ylabel("Power (Watts)")
-        self.ax.grid(True, linestyle='--', alpha=0.3)
-        self.ax.legend(loc='upper right', framealpha=0.9)
+        self.ax.grid(True, linestyle='--', alpha=0.4)
+        self.ax.legend(loc='upper right', framealpha=0.9, fontsize=10)
+        
+        # Always start from 0 on X-axis
+        self.ax.set_xlim(0, L)
         
         if self.auto_scale:
             ymax = max(np.max(agg_data), np.max(true_data), 100)
             self.ax.set_ylim(-10, ymax * 1.15)
         else:
-            self.ax.set_ylim(-50, max(np.max(self.preds), np.max(self.trues)) * 1.2)
+            self.ax.set_ylim(-20, max(np.max(self.preds), np.max(self.trues)) * 1.3)
             
         # Re-add Cursor elements after clear
         self.cursor_line = self.ax.axvline(x=0, color='gray', linestyle=':', alpha=0.5, visible=False)
@@ -394,12 +402,74 @@ class InteractiveBrowser:
             self.slider.set_val(self.curr_idx)
         elif event.key == 'a': self.toggle_fit(None)
         elif event.key == 'd': self.toggle_double(None)
+        elif event.key == 's': self.save_for_paper(None)
         
     def toggle_double(self, event):
         self.double_window = not self.double_window
         label = f"Double Window: {'ON' if self.double_window else 'OFF'}"
         self.btn_double.label.set_text(label)
         self.update_plot()
+        
+    def save_for_paper(self, event):
+        """Export a high-quality square plot for paper publication."""
+        idx = int(self.curr_idx)
+        
+        # Prepare data (same as update_plot)
+        if self.double_window and idx < self.total - 1:
+            idx_next = idx + 1
+            pred_data = np.concatenate([self.preds[idx], self.preds[idx_next]])
+            true_data = np.concatenate([self.trues[idx], self.trues[idx_next]])
+            agg_data  = np.concatenate([self.aggs[idx], self.aggs[idx_next]])
+            base_data = np.concatenate([self.baseline_preds[idx], self.baseline_preds[idx_next]]) if self.baseline_preds is not None else None
+            tag = f"win_{idx}_{idx_next}"
+        else:
+            pred_data = self.preds[idx]
+            true_data = self.trues[idx]
+            agg_data  = self.aggs[idx]
+            base_data = self.baseline_preds[idx] if self.baseline_preds is not None else None
+            tag = f"win_{idx}"
+
+        inj_match = re.search(r'(\d+%)', str(self.model_info))
+        inj_label = inj_match.group(1) if inj_match else "Selected"
+        
+        # Create Square Figure
+        export_fig = plt.figure(figsize=(8, 8))
+        ext_ax = export_fig.add_subplot(111)
+        
+        L = len(pred_data)
+        t = range(L)
+        
+        # Use a more premium color palette for paper
+        ext_ax.fill_between(t, agg_data, color='#f0f0f0', alpha=0.8, label='Aggregate Power')
+        ext_ax.plot(t, true_data, color='#0056b3', linewidth=2.5, label='Ground Truth', alpha=1.0)
+        ext_ax.plot(t, pred_data, color='#cc0000', linestyle='--', linewidth=2.0, 
+                    label=f'Injection Ratio ({inj_label})')
+        
+        if base_data is not None:
+            ext_ax.plot(t, base_data, color='#333333', linestyle=':', linewidth=1.5, label='Baseline (0%)', alpha=0.7)
+            
+        # Publication styling
+        ext_ax.set_title(self.app_name.upper(), fontsize=20, fontweight='bold', pad=15)
+        ext_ax.set_xlabel("Time (minutes)", fontsize=16, fontweight='bold')
+        ext_ax.set_ylabel("p(W)", fontsize=16, fontweight='bold')
+        ext_ax.set_xlim(0, L)
+        
+        if self.auto_scale:
+            ymax = max(np.max(agg_data), np.max(true_data), 100)
+            ext_ax.set_ylim(-10, ymax * 1.15)
+        else:
+            ext_ax.set_ylim(-20, max(np.max(self.preds), np.max(self.trues)) * 1.3)
+            
+        ext_ax.grid(True, linestyle='-', alpha=0.2)
+        ext_ax.legend(loc='upper right', fontsize=12, frameon=True, framealpha=1.0)
+        
+        # Save
+        filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
+        export_fig.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.close(export_fig)
+        
+        print(f"\n✨ High-resolution square plot saved: {filename}")
+        print(f"   DPI: 300 | Size: 8x8 inches")
 
 def visualize_results():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
