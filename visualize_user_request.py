@@ -433,69 +433,67 @@ class InteractiveBrowser:
         inj_label = inj_match.group(1) if inj_match else "Selected"
         
         # --- Publication-Quality Figure ---
-        plt.rcParams.update({
-            "font.family": "serif",
-            "font.serif": ["Times New Roman", "Palatino", "DejaVu Serif"],
-            "mathtext.fontset": "stix",
-        })
-        
-        export_fig, ext_ax = plt.subplots(figsize=(8, 8), dpi=150)
-        
-        L = len(pred_data)
-        t = range(L)
-        
-        # --- Color Palette (Curated for contrast & print clarity) ---
-        AGG_COLOR      = '#B0BEC5'   # Blue-Grey (visible but subordinate)
-        GT_COLOR       = '#1565C0'   # Deep Blue (anchor)
-        PROPOSED_COLOR = '#C62828'   # Deep Red (hero)
-        BASELINE_COLOR = '#546E7A'   # Slate Gray (clear but secondary)
-        
-        # Layer 1: Aggregate Power — VISIBLE fill + outline
-        ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.25, zorder=1)
-        ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.0, alpha=0.6,
-                    label='Aggregate Power', zorder=1)
-        
-        # Layer 2: Ground Truth — solid, thick anchor line
-        ext_ax.plot(t, true_data, color=GT_COLOR, linewidth=2.5,
-                    label='Ground Truth', zorder=2)
-        
-        # Layer 3: Proposed Method — dashed, on top
-        ext_ax.plot(t, pred_data, color=PROPOSED_COLOR, linestyle='--', linewidth=2.0,
-                    label=f'Injection Ratio ({inj_label})', zorder=4)
-        
-        # Layer 4: Baseline — clearly visible dashed (NOT dotted)
-        if base_data is not None:
-            ext_ax.plot(t, base_data, color=BASELINE_COLOR, linestyle=(0, (5, 3)),
-                        linewidth=1.8, label='Baseline (0%)', alpha=0.85, zorder=3)
-            
-        # --- Axes & Labels (LaTeX-style) ---
-        ext_ax.set_title(self.app_name.upper(), fontsize=18, fontweight='bold', pad=20)
-        ext_ax.set_xlabel("Time (minutes)", fontsize=14, fontweight='bold')
-        ext_ax.set_ylabel(r"$P$ (W)", fontsize=14, fontweight='bold', rotation=90)
-        
-        # CRITICAL: Copy exact scale from interactive view (what you see = what you get)
-        ext_ax.set_xlim(self.ax.get_xlim())
-        ext_ax.set_ylim(self.ax.get_ylim())
-        
-        # --- Clean Grid & Spines ---
-        ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
-        ext_ax.spines['top'].set_visible(False)
-        ext_ax.spines['right'].set_visible(False)
-        ext_ax.tick_params(axis='both', labelsize=12)
-        
-        # --- Legend ---
-        ext_ax.legend(loc='upper right', fontsize=11, frameon=True, 
-                      framealpha=0.95, edgecolor='#BDBDBD', fancybox=True)
-        
-        export_fig.tight_layout()
-        
-        # Save
-        filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
-        export_fig.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
-        plt.close(export_fig)
-        
-        # Reset rcParams so interactive plot isn't affected
-        plt.rcParams.update(plt.rcParamsDefault)
+        # Use context managers to apply styles locally without affecting other plots
+        with plt.style.context('bmh'):
+            with plt.rc_context({
+                "font.family": "serif",
+                "font.serif": ["Times New Roman", "Palatino", "DejaVu Serif"],
+                "mathtext.fontset": "stix",
+            }):
+                export_fig, ext_ax = plt.subplots(figsize=(8, 8), dpi=150)
+                
+                L = len(pred_data)
+                t = range(L)
+                
+                # --- Color Palette (Curated for contrast & print clarity) ---
+                AGG_COLOR      = '#B0BEC5'   # Blue-Grey (visible but subordinate)
+                GT_COLOR       = '#1565C0'   # Deep Blue (anchor)
+                PROPOSED_COLOR = '#C62828'   # Deep Red (hero)
+                BASELINE_COLOR = '#546E7A'   # Slate Gray (clear but secondary)
+                
+                # Layer 1: Aggregate Power — VISIBLE fill + outline
+                ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.25, zorder=1)
+                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.0, alpha=0.6,
+                            label='Aggregate Power', zorder=1)
+                
+                # Layer 2: Ground Truth — solid, thick anchor line
+                ext_ax.plot(t, true_data, color=GT_COLOR, linewidth=2.5,
+                            label='Ground Truth', zorder=2)
+                
+                # Layer 3: Proposed Method — dashed, on top
+                ext_ax.plot(t, pred_data, color=PROPOSED_COLOR, linestyle='--', linewidth=2.0,
+                            label=f'Injection Ratio ({inj_label})', zorder=4)
+                
+                # Layer 4: Baseline — clearly visible dashed (NOT dotted)
+                if base_data is not None:
+                    ext_ax.plot(t, base_data, color=BASELINE_COLOR, linestyle=(0, (5, 3)),
+                                linewidth=1.8, label='Baseline (0%)', alpha=0.85, zorder=3)
+                    
+                # --- Axes & Labels (LaTeX-style) ---
+                ext_ax.set_title(self.app_name.upper(), fontsize=18, fontweight='bold', pad=20)
+                ext_ax.set_xlabel("Time (minutes)", fontsize=14, fontweight='bold')
+                ext_ax.set_ylabel(r"$P$ (W)", fontsize=14, fontweight='bold', rotation=90)
+                
+                # CRITICAL: Copy exact scale from interactive view
+                ext_ax.set_xlim(self.ax.get_xlim())
+                ext_ax.set_ylim(self.ax.get_ylim())
+                
+                # --- Clean Grid & Spines ---
+                ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
+                ext_ax.spines['top'].set_visible(False)
+                ext_ax.spines['right'].set_visible(False)
+                ext_ax.tick_params(axis='both', labelsize=12)
+                
+                # --- Legend ---
+                ext_ax.legend(loc='upper right', fontsize=11, frameon=True, 
+                              framealpha=0.95, edgecolor='#BDBDBD', fancybox=True)
+                
+                export_fig.tight_layout()
+                
+                # Save
+                filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
+                export_fig.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close(export_fig)
         
         print(f"\n✨ Publication-quality plot saved: {filename}")
         print(f"   DPI: 300 | Size: 8×8 inches | Font: Serif")
