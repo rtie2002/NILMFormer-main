@@ -332,10 +332,11 @@ class InteractiveBrowser:
             self.ax.set_ylim(-20, max(np.max(self.preds), np.max(self.trues)) * 1.3)
             
         # Re-add Cursor elements after clear
-        self.cursor_line = self.ax.axvline(x=0, color='gray', linestyle=':', alpha=0.5, visible=False)
+        self.cursor_line = self.ax.axvline(x=0, color='gray', linestyle=':', linewidth=1.8, alpha=0.7, visible=False)
         self.cursor_text = self.ax.text(0.02, 0.95, '', transform=self.ax.transAxes, 
-                                        verticalalignment='top', fontsize=10, fontweight='bold',
-                                        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='#d62728'),
+                                        verticalalignment='top', fontsize=16, fontweight='bold',
+                                        linespacing=1.4,
+                                        bbox=dict(boxstyle='round,pad=0.55', facecolor='white', alpha=0.92, edgecolor='#d62728', linewidth=1.6),
                                         visible=False)
             
         self.fig.canvas.draw_idle()
@@ -453,26 +454,26 @@ class InteractiveBrowser:
                 
                 # Layer 1: Aggregate Power — VISIBLE fill + outline
                 ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.25, zorder=1)
-                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.0, alpha=0.6,
+                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.8, alpha=0.7,
                             label='Aggregate Power', zorder=1)
                 
                 # Layer 2: Ground Truth — solid, thick anchor line
-                ext_ax.plot(t, true_data, color=GT_COLOR, linewidth=2.5,
+                ext_ax.plot(t, true_data, color=GT_COLOR, linewidth=3.4,
                             label='Ground Truth', zorder=2)
                 
                 # Layer 3: Proposed Method — dashed, on top
-                ext_ax.plot(t, pred_data, color=PROPOSED_COLOR, linestyle='--', linewidth=2.0,
+                ext_ax.plot(t, pred_data, color=PROPOSED_COLOR, linestyle='--', linewidth=3.0,
                             label=f'Injection Ratio ({inj_label})', zorder=4)
                 
                 # Layer 4: Baseline — clearly visible dashed (NOT dotted)
                 if base_data is not None:
                     ext_ax.plot(t, base_data, color=BASELINE_COLOR, linestyle=(0, (5, 3)),
-                                linewidth=1.8, label='Baseline (0%)', alpha=0.85, zorder=3)
+                                linewidth=2.6, label='Baseline (0%)', alpha=0.9, zorder=3)
                     
                 # --- Axes & Labels (LaTeX-style) ---
-                ext_ax.set_title(self.app_name.upper(), fontsize=18, fontweight='bold', pad=20)
-                ext_ax.set_xlabel("Time (minutes)", fontsize=14, fontweight='bold')
-                ext_ax.set_ylabel(r"$P$ (W)", fontsize=14, fontweight='bold', rotation=90)
+                ext_ax.set_title(self.app_name.upper(), fontsize=28, fontweight='bold', pad=24)
+                ext_ax.set_xlabel("Time (minutes)", fontsize=22, fontweight='bold')
+                ext_ax.set_ylabel(r"$P$ (W)", fontsize=22, fontweight='bold', rotation=90)
                 
                 # CRITICAL: Copy exact scale from interactive view
                 ext_ax.set_xlim(self.ax.get_xlim())
@@ -482,11 +483,12 @@ class InteractiveBrowser:
                 ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
                 ext_ax.spines['top'].set_visible(False)
                 ext_ax.spines['right'].set_visible(False)
-                ext_ax.tick_params(axis='both', labelsize=12)
+                ext_ax.tick_params(axis='both', labelsize=18, width=1.6, length=6)
                 
                 # --- Legend ---
-                ext_ax.legend(loc='upper right', fontsize=11, frameon=True, 
-                              framealpha=0.95, edgecolor='#BDBDBD', fancybox=True)
+                ext_ax.legend(loc='upper right', fontsize=17, frameon=True, 
+                              framealpha=0.95, edgecolor='#BDBDBD', fancybox=True,
+                              borderpad=0.65, labelspacing=0.55, handlelength=2.6)
                 
                 export_fig.tight_layout()
                 
