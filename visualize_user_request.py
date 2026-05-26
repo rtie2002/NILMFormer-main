@@ -458,7 +458,7 @@ class InteractiveBrowser:
                     dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
-                export_fig.subplots_adjust(left=0.15, right=0.98, top=0.86, bottom=0.25)
+                export_fig.subplots_adjust(left=0.14, right=0.98, top=0.74, bottom=0.15)
                 
                 L = len(pred_data)
                 t = range(L)
@@ -488,7 +488,7 @@ class InteractiveBrowser:
                                 linewidth=2.6, label='Baseline (0%)', alpha=0.9, zorder=3)
                     
                 # --- Axes & Labels (LaTeX-style) ---
-                ext_ax.set_title(self.app_name.upper(), fontsize=42, fontweight='bold', pad=34)
+                ext_ax.set_title(self.app_name.upper(), fontsize=42, fontweight='bold', pad=86)
                 ext_ax.set_xlabel("Time (minutes)", fontsize=36, fontweight='bold', labelpad=18)
                 ext_ax.set_ylabel(r"$P$ (W)", fontsize=36, fontweight='bold', rotation=90, labelpad=18)
                 
@@ -503,11 +503,11 @@ class InteractiveBrowser:
                 ext_ax.spines['right'].set_visible(False)
                 ext_ax.tick_params(axis='both', labelsize=30, width=2.0, length=8, pad=10)
                 
-                # --- Legend: outside the plot so it never hides the lines ---
-                ext_ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22),
-                              ncol=2, fontsize=22, frameon=True, 
+                # --- Legend: above the plot so it never hides data or gets cut off ---
+                ext_ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.16),
+                              ncol=2, fontsize=20, frameon=True, 
                               framealpha=0.95, edgecolor='#BDBDBD', fancybox=True,
-                              borderpad=0.8, labelspacing=0.7, handlelength=2.8,
+                              borderpad=0.6, labelspacing=0.45, handlelength=2.5,
                               handletextpad=0.8)
                 
                 # Save
