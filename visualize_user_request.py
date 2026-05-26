@@ -442,23 +442,26 @@ class InteractiveBrowser:
         
         # --- Publication-Quality Figure ---
         # Use context managers to apply styles locally without affecting other plots
-        export_size_inches = 10
+        export_size_inches = 9
         export_dpi = 600
-        with plt.style.context('bmh'):
+        with plt.style.context('default'):
             with plt.rc_context({
                 "font.family": "serif",
                 "font.serif": ["Times New Roman", "Palatino", "DejaVu Serif"],
                 "mathtext.fontset": "stix",
                 "figure.dpi": 200,
                 "savefig.dpi": export_dpi,
-                "axes.linewidth": 1.4,
+                "axes.linewidth": 1.8,
+                "axes.facecolor": "white",
+                "figure.facecolor": "white",
             }):
                 export_fig, ext_ax = plt.subplots(
                     figsize=(export_size_inches, export_size_inches),
                     dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
-                export_fig.subplots_adjust(left=0.14, right=0.98, top=0.74, bottom=0.15)
+                export_fig.subplots_adjust(left=0.15, right=0.985, top=0.80, bottom=0.14)
+                export_fig.suptitle(self.app_name.upper(), fontsize=38, fontweight='bold', y=0.975)
                 
                 L = len(pred_data)
                 t = range(L)
@@ -470,8 +473,8 @@ class InteractiveBrowser:
                 BASELINE_COLOR = '#546E7A'   # Slate Gray (clear but secondary)
                 
                 # Layer 1: Aggregate Power — VISIBLE fill + outline
-                ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.25, zorder=1)
-                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.8, alpha=0.7,
+                ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.22, zorder=1)
+                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.8, alpha=0.75,
                             label='Aggregate Power', zorder=1)
                 
                 # Layer 2: Ground Truth — solid, thick anchor line
@@ -488,7 +491,6 @@ class InteractiveBrowser:
                                 linewidth=2.6, label='Baseline (0%)', alpha=0.9, zorder=3)
                     
                 # --- Axes & Labels (LaTeX-style) ---
-                ext_ax.set_title(self.app_name.upper(), fontsize=42, fontweight='bold', pad=86)
                 ext_ax.set_xlabel("Time (minutes)", fontsize=36, fontweight='bold', labelpad=18)
                 ext_ax.set_ylabel(r"$P$ (W)", fontsize=36, fontweight='bold', rotation=90, labelpad=18)
                 
@@ -498,17 +500,18 @@ class InteractiveBrowser:
                 ext_ax.set_box_aspect(1)
                 
                 # --- Clean Grid & Spines ---
-                ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
+                ext_ax.grid(True, linestyle='-', linewidth=0.6, alpha=0.22, color='#BDBDBD')
                 ext_ax.spines['top'].set_visible(False)
                 ext_ax.spines['right'].set_visible(False)
                 ext_ax.tick_params(axis='both', labelsize=30, width=2.0, length=8, pad=10)
                 
-                # --- Legend: above the plot so it never hides data or gets cut off ---
-                ext_ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.16),
-                              ncol=2, fontsize=20, frameon=True, 
-                              framealpha=0.95, edgecolor='#BDBDBD', fancybox=True,
-                              borderpad=0.6, labelspacing=0.45, handlelength=2.5,
-                              handletextpad=0.8)
+                # --- Legend: compact journal style, outside data area, no bulky box ---
+                handles, labels = ext_ax.get_legend_handles_labels()
+                export_fig.legend(handles, labels, loc='upper center',
+                                  bbox_to_anchor=(0.57, 0.905), ncol=2,
+                                  fontsize=20, frameon=False,
+                                  columnspacing=2.2, labelspacing=0.35,
+                                  handlelength=2.8, handletextpad=0.75)
                 
                 # Save
                 filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
