@@ -461,7 +461,7 @@ class InteractiveBrowser:
                     dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
-                export_fig.subplots_adjust(left=0.125, right=0.985, top=0.765, bottom=0.135)
+                export_fig.subplots_adjust(left=0.155, right=0.985, top=0.765, bottom=0.135)
                 export_fig.suptitle(self.app_name.upper(), fontsize=36, fontweight='bold', y=0.975)
                 
                 L = len(pred_data)
@@ -493,7 +493,7 @@ class InteractiveBrowser:
                     
                 # --- Axes & Labels (LaTeX-style) ---
                 ext_ax.set_xlabel("Time (minutes)", fontsize=34, fontweight='bold', labelpad=10)
-                ext_ax.set_ylabel(r"$P$ (W)", fontsize=34, fontweight='bold', rotation=90, labelpad=10)
+                ext_ax.set_ylabel("Power (W)", fontsize=34, fontweight='bold', rotation=90, labelpad=8)
                 
                 # CRITICAL: Copy exact scale from interactive view
                 ext_ax.set_xlim(self.ax.get_xlim())
