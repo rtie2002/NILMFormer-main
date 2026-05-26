@@ -435,13 +435,23 @@ class InteractiveBrowser:
         
         # --- Publication-Quality Figure ---
         # Use context managers to apply styles locally without affecting other plots
+        export_size_inches = 10
+        export_dpi = 600
         with plt.style.context('bmh'):
             with plt.rc_context({
                 "font.family": "serif",
                 "font.serif": ["Times New Roman", "Palatino", "DejaVu Serif"],
                 "mathtext.fontset": "stix",
+                "figure.dpi": 200,
+                "savefig.dpi": export_dpi,
+                "axes.linewidth": 1.4,
             }):
-                export_fig, ext_ax = plt.subplots(figsize=(8, 8), dpi=150)
+                export_fig, ext_ax = plt.subplots(
+                    figsize=(export_size_inches, export_size_inches),
+                    dpi=200,
+                    constrained_layout=True
+                )
+                export_fig.patch.set_facecolor('white')
                 
                 L = len(pred_data)
                 t = range(L)
@@ -478,6 +488,7 @@ class InteractiveBrowser:
                 # CRITICAL: Copy exact scale from interactive view
                 ext_ax.set_xlim(self.ax.get_xlim())
                 ext_ax.set_ylim(self.ax.get_ylim())
+                ext_ax.set_box_aspect(1)
                 
                 # --- Clean Grid & Spines ---
                 ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
@@ -494,11 +505,11 @@ class InteractiveBrowser:
                 
                 # Save
                 filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
-                export_fig.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
+                export_fig.savefig(filename, dpi=export_dpi, facecolor='white')
                 plt.close(export_fig)
         
         print(f"\n✨ Publication-quality plot saved: {filename}")
-        print(f"   DPI: 300 | Size: 8×8 inches | Font: Serif")
+        print(f"   DPI: {export_dpi} | Size: {export_size_inches}x{export_size_inches} inches | Square PNG | Font: Serif")
 
 def visualize_results():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
