@@ -334,7 +334,7 @@ class InteractiveBrowser:
         # Re-add Cursor elements after clear
         self.cursor_line = self.ax.axvline(x=0, color='#111111', linestyle=':', linewidth=2.2, alpha=0.9, visible=False)
         self.cursor_text = self.ax.text(0.02, 0.95, '', transform=self.ax.transAxes, 
-                                        verticalalignment='top', fontsize=17, fontweight='bold',
+                                        verticalalignment='top', fontsize=18, fontweight='bold',
                                         color='#111111',
                                         linespacing=1.4,
                                         bbox=dict(boxstyle='round,pad=0.55', facecolor='#fffdf5', alpha=0.96, edgecolor='#111111', linewidth=1.8),
@@ -468,14 +468,14 @@ class InteractiveBrowser:
                 t = range(L)
                 
                 # --- Color Palette (Curated for contrast & print clarity) ---
-                AGG_COLOR      = '#B0BEC5'   # Blue-Grey (visible but subordinate)
+                AGG_COLOR      = '#90A4AE'   # Blue-Grey (visible but subordinate)
                 GT_COLOR       = '#1565C0'   # Deep Blue (anchor)
                 PROPOSED_COLOR = '#C62828'   # Deep Red (hero)
-                BASELINE_COLOR = '#546E7A'   # Slate Gray (clear but secondary)
+                BASELINE_COLOR = '#455A64'   # Slate Gray (clear but secondary)
                 
                 # Layer 1: Aggregate Power — VISIBLE fill + outline
-                ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.22, zorder=1)
-                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=2.2, alpha=0.85,
+                ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.24, zorder=1)
+                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=2.4, alpha=0.95,
                             label='Aggregate Power', zorder=1)
                 
                 # Layer 2: Ground Truth — solid, thick anchor line
@@ -510,14 +510,14 @@ class InteractiveBrowser:
                 legend = export_fig.legend(handles, labels, loc='center',
                                            bbox_to_anchor=(0.08, 0.795, 0.84, 0.125),
                                            mode='expand', ncol=2,
-                                           fontsize=18, frameon=False,
+                                           fontsize=20, frameon=False,
                                            columnspacing=1.4, labelspacing=0.35,
                                            handlelength=2.8, handletextpad=0.65)
                 for text in legend.get_texts():
                     text.set_fontweight('bold')
                     text.set_color('#111111')
                 for line in legend.get_lines():
-                    line.set_linewidth(3.4)
+                    line.set_linewidth(3.8)
                 
                 # Save
                 filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
