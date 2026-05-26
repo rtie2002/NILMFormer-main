@@ -481,9 +481,9 @@ class InteractiveBrowser:
                                 linewidth=2.6, label='Baseline (0%)', alpha=0.9, zorder=3)
                     
                 # --- Axes & Labels (LaTeX-style) ---
-                ext_ax.set_title(self.app_name.upper(), fontsize=28, fontweight='bold', pad=24)
-                ext_ax.set_xlabel("Time (minutes)", fontsize=22, fontweight='bold')
-                ext_ax.set_ylabel(r"$P$ (W)", fontsize=22, fontweight='bold', rotation=90)
+                ext_ax.set_title(self.app_name.upper(), fontsize=34, fontweight='bold', pad=28)
+                ext_ax.set_xlabel("Time (minutes)", fontsize=28, fontweight='bold', labelpad=14)
+                ext_ax.set_ylabel(r"$P$ (W)", fontsize=28, fontweight='bold', rotation=90, labelpad=14)
                 
                 # CRITICAL: Copy exact scale from interactive view
                 ext_ax.set_xlim(self.ax.get_xlim())
@@ -494,12 +494,13 @@ class InteractiveBrowser:
                 ext_ax.grid(True, linestyle=':', alpha=0.35, color='#9E9E9E')
                 ext_ax.spines['top'].set_visible(False)
                 ext_ax.spines['right'].set_visible(False)
-                ext_ax.tick_params(axis='both', labelsize=18, width=1.6, length=6)
+                ext_ax.tick_params(axis='both', labelsize=23, width=1.8, length=7, pad=8)
                 
                 # --- Legend ---
-                ext_ax.legend(loc='upper right', fontsize=17, frameon=True, 
+                ext_ax.legend(loc='upper right', fontsize=22, frameon=True, 
                               framealpha=0.95, edgecolor='#BDBDBD', fancybox=True,
-                              borderpad=0.65, labelspacing=0.55, handlelength=2.6)
+                              borderpad=0.8, labelspacing=0.7, handlelength=2.8,
+                              handletextpad=0.8)
                 
                 export_fig.tight_layout()
                 
