@@ -368,6 +368,13 @@ class InteractiveBrowser:
                 txt += f"Ground Truth: {full_true[x]:.1f}W\n"
                 txt += f"Injection Ratio ({inj_label}): {full_pred[x]:.1f}W"
                 
+                if event.xdata < self.curr_L * 0.5:
+                    self.cursor_text.set_position((0.98, 0.95))
+                    self.cursor_text.set_horizontalalignment('right')
+                else:
+                    self.cursor_text.set_position((0.02, 0.95))
+                    self.cursor_text.set_horizontalalignment('left')
+
                 self.cursor_text.set_text(txt)
                 self.cursor_text.set_visible(True)
                 self.fig.canvas.draw_idle()
@@ -448,10 +455,10 @@ class InteractiveBrowser:
             }):
                 export_fig, ext_ax = plt.subplots(
                     figsize=(export_size_inches, export_size_inches),
-                    dpi=200,
-                    constrained_layout=True
+                    dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
+                export_fig.subplots_adjust(left=0.15, right=0.98, top=0.86, bottom=0.25)
                 
                 L = len(pred_data)
                 t = range(L)
@@ -496,13 +503,12 @@ class InteractiveBrowser:
                 ext_ax.spines['right'].set_visible(False)
                 ext_ax.tick_params(axis='both', labelsize=30, width=2.0, length=8, pad=10)
                 
-                # --- Legend ---
-                ext_ax.legend(loc='upper right', fontsize=22, frameon=True, 
+                # --- Legend: outside the plot so it never hides the lines ---
+                ext_ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22),
+                              ncol=2, fontsize=22, frameon=True, 
                               framealpha=0.95, edgecolor='#BDBDBD', fancybox=True,
                               borderpad=0.8, labelspacing=0.7, handlelength=2.8,
                               handletextpad=0.8)
-                
-                export_fig.tight_layout()
                 
                 # Save
                 filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
