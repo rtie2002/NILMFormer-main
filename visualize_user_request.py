@@ -461,8 +461,8 @@ class InteractiveBrowser:
                     dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
-                export_fig.subplots_adjust(left=0.16, right=0.96, top=0.74, bottom=0.18)
-                export_fig.suptitle(self.app_name.upper(), fontsize=36, fontweight='bold', y=0.965)
+                export_fig.subplots_adjust(left=0.125, right=0.985, top=0.765, bottom=0.135)
+                export_fig.suptitle(self.app_name.upper(), fontsize=36, fontweight='bold', y=0.975)
                 
                 L = len(pred_data)
                 t = range(L)
@@ -492,24 +492,23 @@ class InteractiveBrowser:
                                 linewidth=2.6, label='Baseline (0%)', alpha=0.9, zorder=3)
                     
                 # --- Axes & Labels (LaTeX-style) ---
-                ext_ax.set_xlabel("Time (minutes)", fontsize=34, fontweight='bold', labelpad=14)
-                ext_ax.set_ylabel(r"$P$ (W)", fontsize=34, fontweight='bold', rotation=90, labelpad=14)
+                ext_ax.set_xlabel("Time (minutes)", fontsize=34, fontweight='bold', labelpad=10)
+                ext_ax.set_ylabel(r"$P$ (W)", fontsize=34, fontweight='bold', rotation=90, labelpad=10)
                 
                 # CRITICAL: Copy exact scale from interactive view
                 ext_ax.set_xlim(self.ax.get_xlim())
                 ext_ax.set_ylim(self.ax.get_ylim())
-                ext_ax.set_box_aspect(1)
                 
                 # --- Clean Grid & Spines ---
                 ext_ax.grid(True, linestyle='-', linewidth=0.6, alpha=0.22, color='#BDBDBD')
                 ext_ax.spines['top'].set_visible(False)
                 ext_ax.spines['right'].set_visible(False)
-                ext_ax.tick_params(axis='both', labelsize=28, width=2.0, length=8, pad=9)
+                ext_ax.tick_params(axis='both', labelsize=28, width=2.0, length=8, pad=7)
                 
                 # --- Legend: compact journal style, outside data area, no bulky box ---
                 handles, labels = ext_ax.get_legend_handles_labels()
                 legend = export_fig.legend(handles, labels, loc='center',
-                                           bbox_to_anchor=(0.12, 0.785, 0.76, 0.13),
+                                           bbox_to_anchor=(0.08, 0.795, 0.84, 0.125),
                                            mode='expand', ncol=2,
                                            fontsize=18, frameon=False,
                                            columnspacing=1.4, labelspacing=0.35,
