@@ -332,11 +332,12 @@ class InteractiveBrowser:
             self.ax.set_ylim(-20, max(np.max(self.preds), np.max(self.trues)) * 1.3)
             
         # Re-add Cursor elements after clear
-        self.cursor_line = self.ax.axvline(x=0, color='gray', linestyle=':', linewidth=1.8, alpha=0.7, visible=False)
+        self.cursor_line = self.ax.axvline(x=0, color='#111111', linestyle=':', linewidth=2.2, alpha=0.9, visible=False)
         self.cursor_text = self.ax.text(0.02, 0.95, '', transform=self.ax.transAxes, 
-                                        verticalalignment='top', fontsize=16, fontweight='bold',
+                                        verticalalignment='top', fontsize=17, fontweight='bold',
+                                        color='#111111',
                                         linespacing=1.4,
-                                        bbox=dict(boxstyle='round,pad=0.55', facecolor='white', alpha=0.92, edgecolor='#d62728', linewidth=1.6),
+                                        bbox=dict(boxstyle='round,pad=0.55', facecolor='#fffdf5', alpha=0.96, edgecolor='#111111', linewidth=1.8),
                                         visible=False)
             
         self.fig.canvas.draw_idle()
@@ -460,7 +461,7 @@ class InteractiveBrowser:
                     dpi=200
                 )
                 export_fig.patch.set_facecolor('white')
-                export_fig.subplots_adjust(left=0.15, right=0.985, top=0.80, bottom=0.14)
+                export_fig.subplots_adjust(left=0.15, right=0.985, top=0.78, bottom=0.14)
                 export_fig.suptitle(self.app_name.upper(), fontsize=38, fontweight='bold', y=0.975)
                 
                 L = len(pred_data)
@@ -474,7 +475,7 @@ class InteractiveBrowser:
                 
                 # Layer 1: Aggregate Power — VISIBLE fill + outline
                 ext_ax.fill_between(t, agg_data, color=AGG_COLOR, alpha=0.22, zorder=1)
-                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=1.8, alpha=0.75,
+                ext_ax.plot(t, agg_data, color=AGG_COLOR, linewidth=2.2, alpha=0.85,
                             label='Aggregate Power', zorder=1)
                 
                 # Layer 2: Ground Truth — solid, thick anchor line
@@ -507,11 +508,16 @@ class InteractiveBrowser:
                 
                 # --- Legend: compact journal style, outside data area, no bulky box ---
                 handles, labels = ext_ax.get_legend_handles_labels()
-                export_fig.legend(handles, labels, loc='upper center',
-                                  bbox_to_anchor=(0.57, 0.905), ncol=2,
-                                  fontsize=20, frameon=False,
-                                  columnspacing=2.2, labelspacing=0.35,
-                                  handlelength=2.8, handletextpad=0.75)
+                legend = export_fig.legend(handles, labels, loc='upper center',
+                                           bbox_to_anchor=(0.57, 0.925), ncol=2,
+                                           fontsize=21, frameon=False,
+                                           columnspacing=2.2, labelspacing=0.38,
+                                           handlelength=3.0, handletextpad=0.75)
+                for text in legend.get_texts():
+                    text.set_fontweight('bold')
+                    text.set_color('#111111')
+                for line in legend.get_lines():
+                    line.set_linewidth(3.4)
                 
                 # Save
                 filename = f"export_{self.app_name.lower()}_{tag}_{inj_label.replace('%', 'pct')}.png"
